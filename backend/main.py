@@ -38,6 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # --- 2. SECURITY TOOLS ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -136,6 +137,21 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     access_token = create_access_token(data={"sub": user.email, "role": user.role, "id": user.id})
     return {"access_token": access_token, "token_type": "bearer"}
 
+# --- HELPER: Get Current User from Token ---
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+    
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
 # C. SEARCH BOOKS
 @app.get("/books/search/")
 def search_books(query: str, db: Session = Depends(get_db)):
@@ -206,3 +222,40 @@ def return_book(transaction_id: int, db: Session = Depends(get_db)):
     
     db.commit()
     return {"message": "Book returned", "fine_to_pay": fine}
+# F. USER PROFILE (Get My Details & Books)
+@app.get("/users/me")
+def read_users_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # 1. Fetch Active Transactions (Not returned yet)
+    active_issues = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id,
+        models.Transaction.return_date == None
+    ).all()
+    
+    # 2. Format the list of books
+    my_books = []
+    for txn in active_issues:
+        book = txn.book # Get book details via relationship
+        
+        # Calculate Fine (Visual only)
+        fine = 0.0
+        if date.today() > txn.due_date and current_user.role == "student":
+             days_late = (date.today() - txn.due_date).days
+             fine = days_late * 5.0
+
+        my_books.append({
+            "title": book.title,
+            "author": book.author,
+            "acc_no": book.acc_no,
+            "issue_date": txn.issue_date,
+            "due_date": txn.due_date,
+            "fine_est": fine
+        })
+
+    return {
+        "full_name": current_user.full_name,
+        "email": current_user.email,
+        "role": current_user.role,
+        "tokens_total": current_user.max_tokens,
+        "tokens_used": len(active_issues),
+        "active_loans": my_books
+    }

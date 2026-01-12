@@ -4,6 +4,7 @@ import { Routes, Route, Link } from 'react-router-dom';
 import axios from 'axios';
 import Login from './Login'; 
 import Signup from './Signup'; // <--- 1. IMPORT SIGNUP
+import Profile from './Profile'; // <--- 1. IMPORT PROFILE
 import './index.css';
 
 function Home() {
@@ -66,6 +67,7 @@ function App() {
         <h2>College Library</h2>
         <div className="nav-links">
           <Link to="/">Home</Link>
+          <Link to="/profile">My Profile</Link>
           <Link to="/login">Login</Link>
           {/* Optional: Add Signup directly to navbar too */}
           <Link to="/signup" className="btn-gold" style={{marginLeft: '15px', color: '#003366'}}>
@@ -78,6 +80,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} /> {/* <--- 2. ADD ROUTE */}
+        <Route path="/profile" element={<Profile />} />
       </Routes>
     </div>
   );
