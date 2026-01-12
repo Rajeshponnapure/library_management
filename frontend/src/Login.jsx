@@ -1,80 +1,73 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import './index.css';
+import { useNavigate, Link } from 'react-router-dom';
 
 function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    username: '', // FastAPI expects 'username' (which is our email)
-    password: ''
-  });
-  const [error, setError] = useState('');
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
 
   const handleLogin = async () => {
-    setError('');
     try {
-      // 1. Prepare Form Data (FastAPI OAuth2 expects form-data, not JSON)
-      const params = new URLSearchParams();
-      params.append('username', formData.username);
-      params.append('password', formData.password);
-
-      // 2. Send Request
-      const response = await axios.post('http://127.0.0.1:8000/token', params);
-      
-      // 3. Save the "Key" (Token) to Local Storage
-      localStorage.setItem('token', response.data.access_token);
-
-      // 4. Save Role (NEW)
-      localStorage.setItem('role', response.data.role);
-
-      // 5. Force a page reload so the Navbar updates immediately
-      window.location.href = "/";
-      
-      alert("Login Successful!");
-      navigate('/'); // Redirect to Home
+      const res = await axios.post('http://127.0.0.1:8000/login', { email, password });
+      localStorage.setItem('token', res.data.access_token);
+      localStorage.setItem('role', res.data.role); 
+      if(res.data.role === 'admin') navigate('/admin');
+      else navigate('/');
+      window.location.reload(); 
     } catch (err) {
-      console.error(err);
-      setError("Invalid Email or Password");
+      alert("Invalid Credentials");
     }
   };
 
   return (
-    <div className="container" style={{ marginTop: '50px' }}>
-      <div className="search-card" style={{ maxWidth: '400px', margin: '0 auto' }}>
-        <h1 style={{ color: '#003366' }}>Login</h1>
-        <p>Welcome back</p>
+    <div className="form-container">
+      <div className="form-card">
+        <div className="form-header">
+          <h2>Welcome Back</h2>
+          <p>Please enter your details to sign in.</p>
+        </div>
         
-        {error && <p style={{color: 'red', fontWeight: 'bold'}}>{error}</p>}
+        {/* EMAIL INPUT */}
+        <div className="input-group">
+          <label className="form-label">Email Address</label>
+          <div className="input-wrapper">
+            <span className="input-icon">📧</span>
+            <input 
+              className="modern-input"
+              placeholder="student@cbit.edu" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)} 
+            />
+          </div>
+        </div>
 
-        <input 
-          name="username" 
-          placeholder="Email Address" 
-          onChange={handleChange} 
-          style={{ width: '90%', margin: '10px 0' }} 
-        />
-        <input 
-          type="password" 
-          name="password" 
-          placeholder="Password" 
-          onChange={handleChange} 
-          style={{ width: '90%', margin: '10px 0' }} 
-        />
+        {/* PASSWORD INPUT */}
+        <div className="input-group">
+          <label className="form-label">Password</label>
+          <div className="input-wrapper">
+            <span className="input-icon">🔒</span>
+            <input 
+              type="password" 
+              className="modern-input"
+              placeholder="••••••••" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)} 
+            />
+          </div>
+          <div style={{textAlign:'right', marginTop:'5px'}}>
+             <span className="form-link" style={{fontSize:'0.85rem'}}>Forgot Password?</span>
+          </div>
+        </div>
         
-        <button className="btn-gold" onClick={handleLogin} style={{ width: '100%', marginTop: '20px' }}>
+        <button onClick={handleLogin} className="form-btn">
           Sign In
         </button>
 
-        <div style={{ marginTop: '20px' }}>
-          <Link to="/signup" style={{ color: '#003366', fontWeight: 'bold' }}>
-            Create New Account
-          </Link>
+        <div className="form-footer">
+          Don't have an account? <Link to="/signup" className="form-link">Create Account</Link>
         </div>
-        
+
       </div>
     </div>
   );

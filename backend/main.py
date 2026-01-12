@@ -133,49 +133,42 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 
 @app.get("/books/search/")
 def search_books(query: str, db: Session = Depends(get_db)):
-    # 1. Get all matching rows (individual copies)
+    print(f"🔍 Searching for: '{query}'") 
+
     raw_books = db.query(models.Book).filter(
         (models.Book.title.contains(query)) |
         (models.Book.author.contains(query)) |
-        (models.Book.acc_no.contains(query))
+        (models.Book.acc_no.contains(query)) |
+        (models.Book.department.contains(query))
     ).all()
 
-    # 2. Group them by Title + Author
     grouped_books = {}
     
     for book in raw_books:
-
-        # Group ONLY by Title + Author (Ignore spaces/casing)
         clean_title = book.title.strip().lower() if book.title else ""
         clean_author = book.author.strip().lower() if book.author else ""
-
-        # Create a unique key for this book title
         key = (clean_title, clean_author)
         
         if key not in grouped_books:
             grouped_books[key] = {
-                "id": book.id, # We keep one ID to allow requesting
+                "id": book.id,
                 "title": book.title,
                 "author": book.author,
-                "edition_year": book.edition_year,
-                "acc_no": book.acc_no, # Show the first one found
+                "acc_no": book.acc_no,
                 "total_copies": 0,
                 "available_copies": 0
             }
         
-        # Increment counts
-        grouped_books[key]["total_copies"] += 1
-        # Check availability (Handle None/Null safely)
-        is_available = (book.available_copies is not None and book.available_copies > 0)
+        # --- NEW LOGIC: Sum the values from the DB ---
+        # Before we added +1. Now we add the ACTUAL 'total_copies' stored in the row.
+        grouped_books[key]["total_copies"] += book.total_copies
+        grouped_books[key]["available_copies"] += book.available_copies
+        
         if book.available_copies > 0:
-            grouped_books[key]["available_copies"] += 1
-            grouped_books[key]["id"] = book.id # Ensure we point to an available copy
+            grouped_books[key]["id"] = book.id 
             grouped_books[key]["acc_no"] = book.acc_no
 
-    # 3. Convert dictionary back to a list
     return list(grouped_books.values())
-    print(f"   Returning {len(results)} grouped books.")
-    return results
 
 # ==========================================
 # === NEW: STUDENT/FACULTY REQUEST FLOW ===

@@ -1,135 +1,370 @@
 /* frontend/src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+
 :root {
-  --primary: #003366;    /* Deep Blue */
-  --accent: #FFD700;     /* Gold */
-  --text-dark: #1a1a1a;  /* Readable Black */
-  --text-light: #ffffff; /* Pure White */
+  --primary: #003366;       /* Deep Navy */
+  --accent: #d4a017;        /* Elegant Gold */
+  --accent-hover: #b8860b;  /* Darker Gold for hover */
+  --glass: rgba(255, 255, 255, 0.98); /* High Opacity White for Clarity */
+  --text-dark: #1a1a1a;     /* Sharp Black-Gray */
+  --shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
 }
 
-/* 1. BACKGROUND IMAGE (Fixed for all pages) */
-body {
+/* 1. GLOBAL SETTINGS */
+html, body {
   margin: 0;
   padding: 0;
   width: 100%;
   min-height: 100vh;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  
-  /* The Image stays fixed in the back */
+  font-family: 'Poppins', sans-serif;
+  color: var(--text-dark);
+  background: #f0f2f5; 
+}
+
+/* 2. BACKGROUND LOGIC */
+.app-wrapper {
+  width: 100%;
+  min-height: 100vh;
   background: url('/background.png') no-repeat center center fixed;
   background-size: cover;
+  position: relative;
 }
 
-/* 2. OVERLAYS (The "Beautiful" Part) */
-
-/* Home Page: Clear, slightly darkened for contrast */
-.overlay-home {
-  background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.4));
-  min-height: 100vh;
+/* 3. OVERLAYS */
+/* This darkens the background image slightly so the white cards pop */
+.overlay {
   width: 100%;
-}
-
-/* Inner Pages: Dark Frosted Glass (Premium Look) */
-.overlay-page {
-  /* This creates a dark, blurred layer on top of your college image */
-  background: rgba(15, 23, 42, 0.85); /* Dark Slate Blue tint */
-  backdrop-filter: blur(10px);        /* Blurs the background image */
-  -webkit-backdrop-filter: blur(10px);
   min-height: 100vh;
-  width: 100%;
+  background: rgba(0, 20, 40, 0.4); /* Dark Blue Tint */
+  backdrop-filter: blur(4px);       /* Slight blur for focus */
+  padding-bottom: 40px;
 }
 
-/* 3. NAVBAR */
+/* 4. NAVBAR */
 .navbar {
-  background: rgba(0, 0, 0, 0.6); /* Transparent Dark */
-  padding: 1rem 2rem;
+  background: rgba(255, 255, 255, 0.95); /* Solid White Navbar */
+  padding: 0.8rem 3rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 215, 0, 0.3); /* Faint Gold Border */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.navbar h2 {
+  color: var(--primary);
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.6rem;
+  letter-spacing: 0.5px;
 }
 
 .nav-links a, .nav-links button {
-  color: #e0e0e0;
+  color: #444; /* Dark Grey Links */
   text-decoration: none;
-  margin-left: 20px;
-  font-weight: 600; /* Bolder text */
-  font-size: 1.05rem;
+  margin-left: 30px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
   background: none;
   border: none;
   cursor: pointer;
-  transition: all 0.3s ease;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.8); /* Shadow makes text pop */
 }
 
-.nav-links a:hover, .active-link {
+.nav-links a:hover {
   color: var(--accent);
-  transform: translateY(-2px); /* Slight lift effect */
 }
 
-/* 4. CONTENT CARDS (High Visibility) */
+/* 5. CARDS (The Content Box) */
 .container {
-  max-width: 1200px;
-  margin: 40px auto;
+  max-width: 1100px;
+  margin: 60px auto;
   padding: 0 20px;
-  text-align: center;
 }
 
 .glass-card {
-  /* White card allows standard dark text (Highest Readability) */
-  background: rgba(255, 255, 255, 0.96); 
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); /* Deep shadow for depth */
-  margin-bottom: 30px;
-  text-align: center; /* Easier to read */
+  background: var(--glass); /* Almost solid white */
+  padding: 50px;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  text-align: left;
+  animation: slideUp 0.6s ease-out;
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
-/* Headings inside cards */
-.glass-card h1, .glass-card h2, .glass-card h3 {
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* HEADINGS (The Welcome Text Fix) */
+.glass-card h1 {
   color: var(--primary);
-  border-bottom: 2px solid var(--accent);
-  display: inline-block;
-  padding-bottom: 5px;
-  margin-bottom: 20px;
+  font-weight: 800; /* Extra Bold */
+  font-size: 2.8rem;
+  margin-bottom: 15px;
+  
+  /* Text Shadow for Maximum Readability */
+  text-shadow: 2px 2px 0px rgba(0,0,0,0.1); 
+  border-bottom: none;
 }
 
-/* 5. TABLES (Clean & Crisp) */
-table { 
-  width: 100%; 
-  border-collapse: collapse; 
-  margin-top: 20px; 
-  background: white;
-  border-radius: 8px;
-  overflow: hidden; /* Rounds the corners */
-}
-
-th { 
-  background: var(--primary); 
-  color: white; 
-  padding: 15px; 
+.glass-card p {
   font-size: 1.1rem;
+  line-height: 1.8;
+  color: #555;
 }
 
-td { 
-  padding: 15px; 
-  border-bottom: 1px solid #eee; 
-  color: #333; /* Dark Grey text */
-  font-size: 1rem;
-  font-weight: 500;
-}
-
-tr:hover { background-color: #f8f9fa; }
-
-/* 6. BUTTONS */
+/* 6. COOL BUTTONS */
 .btn-gold {
-  background-color: var(--accent);
-  color: #002244;
+  background: var(--primary);
+  color: white;
   border: none;
-  padding: 12px 25px;
-  border-radius: 6px;
-  font-weight: 700;
+  padding: 14px 40px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1.1rem;
   cursor: pointer;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-  transition: transform 0.2s;
+  box-shadow: 0 5px 15px rgba(0, 51, 102, 0.3);
+  transition: all 0.2s ease;
 }
-.btn-gold:hover { transform: scale(1.05); }
+
+.btn-gold:hover {
+  transform: translateY(-2px);
+  background: #004080;
+  box-shadow: 0 8px 20px rgba(0, 51, 102, 0.4);
+}
+
+/* 7. CLEAN TABLES */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 30px;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+thead { background: var(--primary); }
+
+thead th {
+  color: white;
+  padding: 18px 20px;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  text-align: left;
+}
+
+tbody tr {
+  border-bottom: 1px solid #eee;
+  transition: background 0.2s;
+}
+
+tbody tr:hover { background-color: #f0f4f8; }
+
+td {
+  padding: 16px 20px;
+  color: #333;
+  font-size: 0.95rem;
+}
+/* ... keep all previous CSS above ... */
+
+/* 8. MODERN FORMS (Login & Signup) */
+.form-container {
+  max-width: 400px;
+  margin: 80px auto;
+  text-align: center;
+}
+
+/* Make the inputs look like modern app fields */
+input {
+  width: 100%;
+  padding: 15px;
+  margin: 10px 0;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 50px; /* Fully rounded "Pill" shape */
+  background: #f9f9f9;
+  font-size: 1rem;
+  font-family: 'Poppins', sans-serif;
+  outline: none;
+  transition: all 0.3s ease;
+  box-sizing: border-box; /* Fixes padding issues */
+}
+
+input:focus {
+  background: #fff;
+  border-color: var(--primary);
+  box-shadow: 0 4px 15px rgba(0, 51, 102, 0.15); /* Soft glow on focus */
+}
+
+/* Style the Form Card specifically */
+.form-card {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+}
+
+.form-card h2 {
+  color: var(--primary);
+  margin-bottom: 20px;
+  font-weight: 700;
+}
+
+/* Make the Login/Signup buttons wide and round */
+.form-btn {
+  width: 100%;
+  padding: 15px;
+  border-radius: 50px;
+  margin-top: 20px;
+  background: var(--primary);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s;
+  box-shadow: 0 5px 15px rgba(0, 51, 102, 0.3);
+}
+
+.form-btn:hover {
+  transform: scale(1.02);
+  background: #004080;
+}
+/* ... keep all previous CSS ... */
+
+/* 9. DETAILED & MODERN FORMS */
+.form-container {
+  max-width: 450px;
+  margin: 60px auto;
+  perspective: 1000px; /* For 3D effects */
+}
+
+.form-card {
+  background: rgba(255, 255, 255, 0.9); /* High visibility glass */
+  padding: 50px 40px;
+  border-radius: 20px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  text-align: left; /* Aligns labels to the left */
+}
+
+.form-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.form-header h2 {
+  color: var(--primary);
+  font-size: 2rem;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.form-header p {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+/* INPUT GROUPS (Label + Icon + Field) */
+.input-group {
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #444;
+  font-weight: 600;
+  margin-bottom: 8px;
+  margin-left: 10px;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* The Icon inside the input */
+.input-icon {
+  position: absolute;
+  left: 15px;
+  font-size: 1.1rem;
+  color: var(--primary);
+  opacity: 0.6;
+  z-index: 2;
+}
+
+/* The Field itself */
+.modern-input {
+  width: 100%;
+  padding: 14px 15px 14px 45px; /* Left padding makes room for icon */
+  border: 2px solid #e1e5ee;
+  border-radius: 12px; /* Soft square, not full pill */
+  background: #f8faff;
+  font-size: 1rem;
+  font-family: 'Poppins', sans-serif;
+  transition: all 0.3s ease;
+  color: #333;
+}
+
+.modern-input:focus {
+  border-color: var(--primary);
+  background: white;
+  box-shadow: 0 0 0 4px rgba(0, 51, 102, 0.1); /* Blue glow ring */
+  outline: none;
+}
+
+/* Dropdown specific */
+.modern-select {
+  appearance: none; /* Removes default arrow */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23003366' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 15px center;
+  background-size: 15px;
+}
+
+/* BUTTONS */
+.form-btn {
+  width: 100%;
+  padding: 15px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary), #004080);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(0, 51, 102, 0.2);
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin-top: 10px;
+}
+
+.form-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 30px rgba(0, 51, 102, 0.3);
+}
+
+/* LINKS (Forgot Pass, etc) */
+.form-footer {
+  text-align: center;
+  margin-top: 25px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.form-link {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.form-link:hover {
+  text-decoration: underline;
+  color: var(--accent-hover);
+}
