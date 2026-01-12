@@ -1,11 +1,11 @@
 // frontend/src/App.jsx
 import React, { useState } from 'react';
-import { Routes, Route, Link } from 'react-router-dom'; // <--- Import Routes
+import { Routes, Route, Link } from 'react-router-dom';
 import axios from 'axios';
-import Login from './Login'; // <--- Import the Login page
+import Login from './Login'; 
+import Signup from './Signup'; // <--- 1. IMPORT SIGNUP
 import './index.css';
 
-// 1. Create a component for the Home Page (Search)
 function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [books, setBooks] = useState([]);
@@ -59,24 +59,25 @@ function Home() {
   );
 }
 
-// 2. Main App Component with Navigation
 function App() {
   return (
     <div className="app-wrapper">
-      {/* Navbar is visible on ALL pages */}
       <nav className="navbar">
         <h2>College Library</h2>
         <div className="nav-links">
-          {/* USE Link INSTEAD OF <a> TAGS */}
           <Link to="/">Home</Link>
           <Link to="/login">Login</Link>
+          {/* Optional: Add Signup directly to navbar too */}
+          <Link to="/signup" className="btn-gold" style={{marginLeft: '15px', color: '#003366'}}>
+             Sign Up
+          </Link>
         </div>
       </nav>
 
-      {/* Define which component loads for which URL */}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} /> {/* <--- 2. ADD ROUTE */}
       </Routes>
     </div>
   );
