@@ -28,6 +28,12 @@ function Login() {
       
       // 3. Save the "Key" (Token) to Local Storage
       localStorage.setItem('token', response.data.access_token);
+
+      // 4. Save Role (NEW)
+      localStorage.setItem('role', response.data.role);
+
+      // 5. Force a page reload so the Navbar updates immediately
+      window.location.href = "/";
       
       alert("Login Successful!");
       navigate('/'); // Redirect to Home

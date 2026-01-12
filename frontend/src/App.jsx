@@ -1,86 +1,63 @@
-// frontend/src/App.jsx
-import React, { useState } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
-import axios from 'axios';
+import React from 'react';
+import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import Login from './Login'; 
-import Signup from './Signup'; // <--- 1. IMPORT SIGNUP
-import Profile from './Profile'; // <--- 1. IMPORT PROFILE
+import Signup from './Signup'; 
+import Profile from './Profile';
+import Home from './Home';
+import Books from './Books';
+import AdminDashboard from './AdminDashboard'; 
 import './index.css';
 
-function Home() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [books, setBooks] = useState([]);
-
-  const handleSearch = async () => {
-    try {
-      const response = await axios.get(`http://127.0.0.1:8000/books/search/?query=${searchTerm}`);
-      setBooks(response.data);
-    } catch (error) {
-      console.error("Error", error);
-    }
+function App() {
+  const role = localStorage.getItem('role');
+  const isLoggedIn = !!localStorage.getItem('token');
+  const location = useLocation();
+  const isHomePage = location.pathname === '/';
+  
+  const handleLogout = () => {
+      localStorage.clear(); 
+      window.location.href = '/login'; 
   };
 
   return (
-    <div className="container">
-      <div className="search-card">
-        <h1>Find Your Book</h1>
-        <div className="search-box">
-          <input 
-            type="text" 
-            placeholder="Search title, author, or acc no..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button className="btn-gold" onClick={handleSearch}>Search</button>
-        </div>
-      </div>
-
-      {books.length > 0 && (
-        <div className="table-card">
-          <table>
-            <thead>
-              <tr><th>Acc No</th><th>Title</th><th>Author</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              {books.map((book) => (
-                <tr key={book.id}>
-                  <td>{book.acc_no}</td>
-                  <td>{book.title}</td>
-                  <td>{book.author}</td>
-                  <td style={{color: book.available_copies > 0 ? 'green' : 'red'}}>
-                     {book.available_copies > 0 ? 'Available' : 'Issued'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function App() {
-  return (
-    <div className="app-wrapper">
+    // The CSS 'body' handles the image. 
+    // This div handles the Tint/Blur effect on top of it.
+    <div className={isHomePage ? "overlay-home" : "overlay-page"}>
+      
       <nav className="navbar">
-        <h2>College Library</h2>
+        <div style={{display:'flex', alignItems:'center'}}>
+            <h2 style={{margin:0, color: '#FFD700', textShadow: '0 2px 4px rgba(0,0,0,0.5)'}}>
+              CBIT Library
+            </h2>
+        </div>
         <div className="nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/profile">My Profile</Link>
-          <Link to="/login">Login</Link>
-          {/* Optional: Add Signup directly to navbar too */}
-          <Link to="/signup" className="btn-gold" style={{marginLeft: '15px', color: '#003366'}}>
-             Sign Up
-          </Link>
+          <Link to="/" className={location.pathname === '/' ? 'active-link' : ''}>Home</Link>
+          <Link to="/books" className={location.pathname === '/books' ? 'active-link' : ''}>Search Books</Link>
+          
+          {role === 'admin' && (
+            <Link to="/admin" style={{color:'#FFD700'}}>Admin Dashboard</Link>
+          )}
+
+          {role === 'student' && <Link to="/profile">My Profile</Link>}
+
+          {isLoggedIn ? (
+             <button onClick={handleLogout} className="btn-gold" style={{marginLeft:'15px'}}>Logout</button>
+          ) : (
+            <>
+                <Link to="/login">Login</Link>
+                <Link to="/signup" className="btn-gold" style={{marginLeft:'15px'}}>Sign Up</Link>
+            </>
+          )}
         </div>
       </nav>
 
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/books" element={<Books />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} /> {/* <--- 2. ADD ROUTE */}
+        <Route path="/signup" element={<Signup />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/admin" element={<AdminDashboard />} />
       </Routes>
     </div>
   );

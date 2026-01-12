@@ -1,7 +1,12 @@
-# backend/models.py (Updated)
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date
+from sqlalchemy import Column, Integer, String, Date, Float, Enum, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
+import enum
+
+class RequestStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
 class User(Base):
     __tablename__ = "users"
@@ -9,37 +14,41 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     full_name = Column(String)
-    role = Column(String)  # 'student', 'faculty', 'admin'
-    max_tokens = Column(Integer, default=3) 
-    
-    # New fields for student details
+    role = Column(String)
+    max_tokens = Column(Integer)
     registration_number = Column(String, nullable=True)
     branch = Column(String, nullable=True)
     year = Column(String, nullable=True)
-    photo_url = Column(String, nullable=True)
-
-    issued_books = relationship("Transaction", back_populates="borrower")
+    transactions = relationship("Transaction", back_populates="user")
+    requests = relationship("RentRequest", back_populates="user")
 
 class Book(Base):
     __tablename__ = "books"
+
     id = Column(Integer, primary_key=True, index=True)
     
-    # Exact mapping from your CSV headers
-    acc_no = Column(String,  nullable=True)  # "Acc.NO"
-    author = Column(String)                           # "Author"
-    title = Column(String, index=True)                # "Title"
-    department = Column(String)                       # "Dept"
-    total_copies = Column(Integer)                    # "No.of Copies"
-    available_copies = Column(Integer)                # We calculate this
-    edition_year = Column(String)                     # "Edition/Year"
-    pages = Column(String)                            # "Pages"
-    volume = Column(String)                           # "Volume"
-    publisher = Column(String)                        # "Publisher"
-    source = Column(String)                           # "Sources"
-    bill_no_date = Column(String)                     # "Bill No & Date"
-    cost = Column(String)                             # "Cost"
+    # --- CHANGED: Removed 'unique=True' so we can store duplicates ---
+    acc_no = Column(String, index=True) 
+    
+    title = Column(String, index=True)
+    author = Column(String)
+    department = Column(String) 
+
+    # Excel Data Mapping
+    publisher = Column(String, nullable=True)
+    edition_year = Column(String, nullable=True)
+    price = Column(Float, default=0.0)
+    pages = Column(String, nullable=True)
+    acquisition_date = Column(String, nullable=True)
+    call_no = Column(String, nullable=True)
+    bill_no = Column(String, nullable=True)
+    remarks = Column(String, nullable=True)
+    
+    total_copies = Column(Integer, default=1)
+    available_copies = Column(Integer, default=1)
 
     transactions = relationship("Transaction", back_populates="book")
+    requests = relationship("RentRequest", back_populates="book")
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -50,6 +59,15 @@ class Transaction(Base):
     due_date = Column(Date)
     return_date = Column(Date, nullable=True)
     fine_amount = Column(Float, default=0.0)
-
-    borrower = relationship("User", back_populates="issued_books")
+    user = relationship("User", back_populates="transactions")
     book = relationship("Book", back_populates="transactions")
+
+class RentRequest(Base):
+    __tablename__ = "rent_requests"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    book_id = Column(Integer, ForeignKey("books.id"))
+    request_date = Column(Date)
+    status = Column(Enum(RequestStatus), default=RequestStatus.PENDING)
+    user = relationship("User", back_populates="requests")
+    book = relationship("Book", back_populates="requests")

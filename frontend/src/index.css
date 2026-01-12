@@ -1,125 +1,135 @@
 /* frontend/src/index.css */
 :root {
-  --primary-blue: #003366;
-  --accent-gold: #FFD700;
-  --bg-gray: #f0f2f5;
+  --primary: #003366;    /* Deep Blue */
+  --accent: #FFD700;     /* Gold */
+  --text-dark: #1a1a1a;  /* Readable Black */
+  --text-light: #ffffff; /* Pure White */
 }
 
+/* 1. BACKGROUND IMAGE (Fixed for all pages) */
 body {
   margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background-color: var(--bg-gray);
-  color: #333;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  
+  /* The Image stays fixed in the back */
+  background: url('/background.png') no-repeat center center fixed;
+  background-size: cover;
 }
 
-/* Navbar: Fixed at the top */
+/* 2. OVERLAYS (The "Beautiful" Part) */
+
+/* Home Page: Clear, slightly darkened for contrast */
+.overlay-home {
+  background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.4));
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Inner Pages: Dark Frosted Glass (Premium Look) */
+.overlay-page {
+  /* This creates a dark, blurred layer on top of your college image */
+  background: rgba(15, 23, 42, 0.85); /* Dark Slate Blue tint */
+  backdrop-filter: blur(10px);        /* Blurs the background image */
+  -webkit-backdrop-filter: blur(10px);
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* 3. NAVBAR */
 .navbar {
-  background-color: var(--primary-blue);
-  color: white;
-  height: 60px;
+  background: rgba(0, 0, 0, 0.6); /* Transparent Dark */
+  padding: 1rem 2rem;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 0 2rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.3); /* Faint Gold Border */
 }
 
-.navbar h2 {
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.nav-links a {
-  color: white;
+.nav-links a, .nav-links button {
+  color: #e0e0e0;
   text-decoration: none;
   margin-left: 20px;
-  font-weight: 500;
-  transition: color 0.2s;
-}
-
-.nav-links a:hover {
-  color: var(--accent-gold);
-}
-
-/* Container for the page content */
-.container {
-  max-width: 1000px;
-  margin: 40px auto; /* Centers the container */
-  padding: 0 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center; /* Centers items horizontally */
-}
-
-/* The Search Card */
-.search-card {
-  background: white;
-  width: 100%;
-  max-width: 800px;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.search-box {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 20px;
-}
-
-/* Inputs & Buttons */
-select, input {
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 1rem;
-}
-
-input {
-  flex-grow: 1; /* Input takes remaining space */
-}
-
-.btn-gold {
-  background-color: var(--accent-gold);
-  color: var(--primary-blue);
+  font-weight: 600; /* Bolder text */
+  font-size: 1.05rem;
+  background: none;
   border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  font-weight: bold;
   cursor: pointer;
-  transition: transform 0.1s;
+  transition: all 0.3s ease;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8); /* Shadow makes text pop */
 }
 
-.btn-gold:active {
-  transform: scale(0.98);
+.nav-links a:hover, .active-link {
+  color: var(--accent);
+  transform: translateY(-2px); /* Slight lift effect */
 }
 
-/* Results Table */
-.table-card {
-  background: white;
-  width: 100%;
-  max-width: 900px;
-  padding: 1rem;
+/* 4. CONTENT CARDS (High Visibility) */
+.container {
+  max-width: 1200px;
+  margin: 40px auto;
+  padding: 0 20px;
+  text-align: center;
+}
+
+.glass-card {
+  /* White card allows standard dark text (Highest Readability) */
+  background: rgba(255, 255, 255, 0.96); 
+  padding: 40px;
   border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  overflow-x: auto; /* Handles small screens */
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); /* Deep shadow for depth */
+  margin-bottom: 30px;
+  text-align: center; /* Easier to read */
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+/* Headings inside cards */
+.glass-card h1, .glass-card h2, .glass-card h3 {
+  color: var(--primary);
+  border-bottom: 2px solid var(--accent);
+  display: inline-block;
+  padding-bottom: 5px;
+  margin-bottom: 20px;
 }
 
-th, td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #eee;
+/* 5. TABLES (Clean & Crisp) */
+table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  margin-top: 20px; 
+  background: white;
+  border-radius: 8px;
+  overflow: hidden; /* Rounds the corners */
 }
 
-th {
-  background-color: #f8f9fa;
-  color: var(--primary-blue);
+th { 
+  background: var(--primary); 
+  color: white; 
+  padding: 15px; 
+  font-size: 1.1rem;
 }
+
+td { 
+  padding: 15px; 
+  border-bottom: 1px solid #eee; 
+  color: #333; /* Dark Grey text */
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+tr:hover { background-color: #f8f9fa; }
+
+/* 6. BUTTONS */
+.btn-gold {
+  background-color: var(--accent);
+  color: #002244;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+.btn-gold:hover { transform: scale(1.05); }
