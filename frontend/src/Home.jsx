@@ -2,43 +2,45 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 function Home() {
+  const token = localStorage.getItem('token');
+
   return (
-    <div className="container">
-      <div className="glass-card" style={{ maxWidth: '800px', margin: '50px auto' }}>
-        <h1 style={{ fontSize: '2.5rem', borderBottom: 'none', color: '#003366' }}>Welcome to CBIT Library</h1>
-        <p style={{ fontSize: '1.2rem', lineHeight: '1.6', color: '#333' }}>
-          Our library is a hub of knowledge featuring a vast collection of resources 
-          tailored for every branch of engineering and management.
+    <div className="container" style={{textAlign: 'center', marginTop: '80px'}}>
+      <div className="glass-card" style={{maxWidth: '900px', margin: '0 auto'}}>
+        <h1 style={{fontSize: '3rem', color: '#003366', marginBottom: '10px'}}>CBIT Digital Library</h1>
+        <p style={{fontSize: '1.2rem', color: '#555', marginBottom: '40px'}}>
+          Access thousands of resources from Engineering to Management. <br/>
+          Request books, track your due dates, and manage your account online.
         </p>
-        
-        <div style={{ display: 'flex', justifyContent: 'space-around', margin: '40px 0', flexWrap: 'wrap', textAlign: 'center' }}>
-          <div style={{ margin: '10px' }}>
-            <h2 style={{ color: '#d4a017', fontSize: '2.5rem', margin: 0 }}>15,000+</h2>
-            <p style={{fontWeight:'bold', color: '#555'}}>Books Available</p>
+
+        {/* Stats Grid */}
+        <div style={{display: 'flex', justifyContent: 'center', gap: '40px', marginBottom: '50px', flexWrap: 'wrap'}}>
+          <div>
+            <h2 style={{fontSize: '2.5rem', color: '#d4a017', margin: 0}}>15k+</h2>
+            <span style={{fontWeight: 'bold', color: '#666'}}>Books</span>
           </div>
-          <div style={{ margin: '10px' }}>
-            <h2 style={{ color: '#d4a017', fontSize: '2.5rem', margin: 0 }}>8+</h2>
-            <p style={{fontWeight:'bold', color: '#555'}}>Departments</p>
+          <div>
+            <h2 style={{fontSize: '2.5rem', color: '#d4a017', margin: 0}}>8+</h2>
+            <span style={{fontWeight: 'bold', color: '#666'}}>Departments</span>
           </div>
-          <div style={{ margin: '10px' }}>
-            <h2 style={{ color: '#d4a017', fontSize: '2.5rem', margin: 0 }}>24/7</h2>
-            <p style={{fontWeight:'bold', color: '#555'}}>Digital Access</p>
+          <div>
+            <h2 style={{fontSize: '2.5rem', color: '#d4a017', margin: 0}}>24/7</h2>
+            <span style={{fontWeight: 'bold', color: '#666'}}>Access</span>
           </div>
         </div>
 
-        <p style={{ color: '#555' }}>
-          <strong>Departments:</strong> CSE, ECE, EEE, Civil, Mechanical, MBA, and BS&H.
-        </p>
-
-        {/* --- CENTERED BUTTON FIX --- */}
-        <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'center' }}> 
-          <Link to="/books">
-            <button className="btn-gold" style={{ padding: '15px 50px', fontSize: '1.2rem' }}>
-              Search Books
-            </button>
-          </Link>
-        </div>
-
+        {/* Action Buttons */}
+        {!token ? (
+          <div>
+             <Link to="/login"><button className="btn-gold" style={{marginRight: '20px'}}>Login to Portal</button></Link>
+             <Link to="/books"><button className="btn-cancel" style={{color: '#003366', borderColor: '#003366'}}>Browse Books</button></Link>
+          </div>
+        ) : (
+          <div>
+             <Link to="/books"><button className="btn-gold" style={{marginRight: '20px'}}>Find a Book</button></Link>
+             <Link to="/profile"><button className="btn-cancel" style={{color: '#003366', borderColor: '#003366'}}>My Dashboard</button></Link>
+          </div>
+        )}
       </div>
     </div>
   );

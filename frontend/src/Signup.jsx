@@ -1,23 +1,48 @@
+// frontend/src/Signup.jsx
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import './index.css'; 
 
 function Signup() {
   const [formData, setFormData] = useState({
     full_name: '', 
     email: '', 
     password: '', 
+    mobile_number: '', 
     role: 'student',
-    registration_number: '', // Roll Number
-    branch: 'CSE',           // Default Branch
-    year: '1'                // Default Year
+    registration_number: '',
+    branch: 'CSE',
+    year: '1'
   });
   
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
-  const handleSignup = async () => {
+  const handleSignup = async (e) => {
+    e.preventDefault(); 
+
+    // --- 1. SECURITY CHECK: Enforce College Domain ---
+    const allowedDomain = '@cbit.edu.in'; 
+    if (!formData.email.toLowerCase().endsWith(allowedDomain)) {
+      alert(`Access Restricted! \n\nYou must use your official college email (${allowedDomain}) to register.`);
+      return;
+    }
+
+    // --- 2. VALIDATION: Check if Email Matches Reg No (Students Only) ---
+    if (formData.role === 'student') {
+        // Extract the ID part from email (e.g., "232p1a3201" from "232p1a3201@cbit.edu.in")
+        const emailIdPart = formData.email.split('@')[0].toLowerCase();
+        const regNo = formData.registration_number.toLowerCase();
+
+        if (emailIdPart !== regNo) {
+            alert(`Identity Mismatch! \n\nYour email "${formData.email}" does not match your Registration Number "${formData.registration_number}".\n\nEmail should be: ${formData.registration_number}${allowedDomain}`);
+            return;
+        }
+    }
+    // -------------------------------------------------------------------
+
     try {
-      // We send all data; backend will ignore extra fields if role is 'admin' etc.
       await axios.post('http://127.0.0.1:8000/signup', formData);
       alert("Account Created! Please Login.");
       navigate('/login');
@@ -26,136 +51,140 @@ function Signup() {
     }
   };
 
+  const handleChange = (e) => setFormData({...formData, [e.target.name]: e.target.value});
+
   return (
-    <div className="form-container" style={{maxWidth: '500px'}}> {/* Slightly wider for 2 columns */}
-      <div className="form-card">
-        <div className="form-header">
-          <h2>Create Account</h2>
-          <p>Join the CBIT Library portal today.</p>
-        </div>
+    <div className="container" style={{maxWidth: '600px', marginTop: '50px'}}>
+      <div className="glass-card" style={{padding: '40px'}}>
+        <h2 style={{color: '#003366', textAlign: 'center'}}>Create Account</h2>
+        <p style={{textAlign:'center', color:'#666', marginBottom:'30px'}}>Join the CBIT Library portal.</p>
 
-        {/* FULL NAME */}
-        <div className="input-group">
-          <label className="form-label">Full Name</label>
-          <div className="input-wrapper">
-            <span className="input-icon">👤</span>
+        <form onSubmit={handleSignup}>
+          
+          {/* Full Name */}
+          <div className="input-group" style={{marginBottom: '15px'}}>
+            <label className="form-label">
+                Full Name <span style={{color: 'red'}}>*</span>
+            </label>
             <input 
-              className="modern-input"
-              placeholder="e.g. Rahul Sharma" 
-              onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+              className="modern-input" 
+              name="full_name" 
+              placeholder="John Doe" 
+              onChange={handleChange} 
+              required 
             />
           </div>
-        </div>
 
-        {/* EMAIL */}
-        <div className="input-group">
-          <label className="form-label">Email Address</label>
-          <div className="input-wrapper">
-            <span className="input-icon">📧</span>
-            <input 
-              className="modern-input"
-              placeholder="student@cbit.edu" 
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
-            />
-          </div>
-        </div>
-
-        {/* PASSWORD */}
-        <div className="input-group">
-          <label className="form-label">Password</label>
-          <div className="input-wrapper">
-            <span className="input-icon">🔒</span>
-            <input 
-              type="password" 
-              className="modern-input"
-              placeholder="Create a strong password" 
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
-            />
-          </div>
-        </div>
-        
-        {/* ROLE SELECTION */}
-        <div className="input-group">
-            <label className="form-label">I am a...</label>
-            <div className="input-wrapper">
-                <span className="input-icon">🎓</span>
-                <select 
-                    className="modern-input modern-select"
-                    value={formData.role}
-                    onChange={(e) => setFormData({...formData, role: e.target.value})}
-                >
-                    <option value="student">Student</option>
-                    <option value="faculty">Faculty Member</option>
-                </select>
+          {/* Email & Mobile */}
+          <div style={{display:'flex', gap:'15px', marginBottom: '15px'}}>
+            <div className="input-group" style={{flex:1}}>
+              <label className="form-label">
+                Email <span style={{color: 'red'}}>*</span>
+              </label>
+              <input 
+                className="modern-input" 
+                name="email" 
+                type="email" 
+                placeholder="232p1a...@cbit.edu.in" 
+                onChange={handleChange} 
+                required 
+              />
             </div>
-        </div>
+            <div className="input-group" style={{flex:1}}>
+              <label className="form-label">
+                Mobile No <span style={{color: 'red'}}>*</span>
+              </label>
+              <input 
+                className="modern-input" 
+                name="mobile_number" 
+                placeholder="9876543210" 
+                onChange={handleChange} 
+                required 
+              />
+            </div>
+          </div>
 
-        {/* --- STUDENT SPECIFIC FIELDS (Only show if role is Student) --- */}
-        {formData.role === 'student' && (
-          <>
-            {/* ROLL NUMBER */}
-            <div className="input-group">
-              <label className="form-label">Roll Number</label>
-              <div className="input-wrapper">
-                <span className="input-icon">🆔</span>
+          {/* Password with Toggle */}
+          <div className="input-group" style={{marginBottom: '15px'}}>
+            <label className="form-label">
+                Password <span style={{color: 'red'}}>*</span>
+            </label>
+            <div className="password-input-wrapper">
                 <input 
-                  className="modern-input"
-                  placeholder="e.g. 232p1a****" 
-                  onChange={(e) => setFormData({...formData, registration_number: e.target.value})}
+                  className="modern-input" 
+                  type={showPassword ? "text" : "password"} 
+                  name="password" 
+                  placeholder="••••••" 
+                  onChange={handleChange} 
+                  required 
+                />
+                <button 
+                  type="button" 
+                  className="password-toggle-btn"
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? "Hide Password" : "Show Password"}
+                >
+                  {showPassword ? "👁️" : "🙈"} 
+                </button>
+            </div>
+          </div>
+
+          {/* Role Select */}
+          <div className="input-group" style={{marginBottom: '15px'}}>
+            <label className="form-label">
+                Role <span style={{color: 'red'}}>*</span>
+            </label>
+            <select className="modern-input modern-select" name="role" onChange={handleChange} required>
+              <option value="student">Student</option>
+              <option value="faculty">Faculty</option>
+            </select>
+          </div>
+
+          {/* Student Fields */}
+          {formData.role === 'student' && (
+            <div style={{background: '#f8f9fa', padding: '15px', borderRadius: '10px', marginBottom: '20px'}}>
+              <div className="input-group" style={{marginBottom: '10px'}}>
+                <label className="form-label">
+                    Registration No <span style={{color: 'red'}}>*</span>
+                </label>
+                <input 
+                  className="modern-input" 
+                  name="registration_number" 
+                  placeholder="232P1A****" 
+                  onChange={handleChange} 
+                  required 
                 />
               </div>
-            </div>
-
-            {/* BRANCH & YEAR (Side by Side) */}
-            <div style={{display: 'flex', gap: '15px'}}>
-              
-              <div className="input-group" style={{flex: 1}}>
-                <label className="form-label">Branch</label>
-                <div className="input-wrapper">
-                  <span className="input-icon">📚</span>
-                  <select 
-                    className="modern-input modern-select"
-                    onChange={(e) => setFormData({...formData, branch: e.target.value})}
-                  >
-                    <option value="CSE">CSE</option>
-                    <option value="ECE">ECE</option>
-                    <option value="EEE">EEE</option>
-                    <option value="CIVIL">CIVIL</option>
-                    <option value="MECH">MECH</option>
-                    <option value="MBA">MBA</option>
-                    
+              <div style={{display:'flex', gap:'15px'}}>
+                <div className="input-group" style={{flex:1}}>
+                  <label className="form-label">
+                    Branch <span style={{color: 'red'}}>*</span>
+                  </label>
+                  <select className="modern-input modern-select" name="branch" onChange={handleChange} required>
+                    <option value="CSE">CSE</option><option value="ECE">ECE</option>
+                    <option value="EEE">EEE</option><option value="CIVIL">CIVIL</option>
+                    <option value="MECH">MECH</option><option value="MBA">MBA</option>
+                  </select>
+                </div>
+                <div className="input-group" style={{flex:1}}>
+                  <label className="form-label">
+                    Year <span style={{color: 'red'}}>*</span>
+                  </label>
+                  <select className="modern-input modern-select" name="year" onChange={handleChange} required>
+                    <option value="1">1st</option><option value="2">2nd</option>
+                    <option value="3">3rd</option><option value="4">4th</option>
                   </select>
                 </div>
               </div>
-
-              <div className="input-group" style={{flex: 1}}>
-                <label className="form-label">Year</label>
-                <div className="input-wrapper">
-                  <span className="input-icon">📅</span>
-                  <select 
-                    className="modern-input modern-select"
-                    onChange={(e) => setFormData({...formData, year: e.target.value})}
-                  >
-                    <option value="1">1st Year</option>
-                    <option value="2">2nd Year</option>
-                    <option value="3">3rd Year</option>
-                    <option value="4">4th Year</option>
-                  </select>
-                </div>
-              </div>
-
             </div>
-          </>
-        )}
+          )}
 
-        <button onClick={handleSignup} className="form-btn">
-          Create Account
-        </button>
+          <button type="submit" className="btn-gold" style={{width:'100%', padding:'12px'}}>Create Account</button>
+        </form>
 
-        <div className="form-footer">
-          Already have an account? <Link to="/login" className="form-link">Sign In</Link>
+        <div style={{textAlign:'center', marginTop:'15px'}}>
+          Already have an account? <Link to="/login" style={{color:'#d4a017', fontWeight:'bold'}}>Sign In</Link>
         </div>
-
       </div>
     </div>
   );

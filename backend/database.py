@@ -2,11 +2,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
-from dotenv import load_dotenv # <--- New Import
+from dotenv import load_dotenv
 
-load_dotenv() # <--- Loads the .env file
+# Load environment variables
+load_dotenv()
 
-# Use the URL from .env, or fallback to sqlite if missing
+# Use SQLite by default, but ready for production
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./library.db")
 
 engine = create_engine(

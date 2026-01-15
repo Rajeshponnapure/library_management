@@ -32,7 +32,7 @@ def clean_text(val):
 
 def seed_data():
     db = SessionLocal()
-    file_path = "C:/Users/saimo/library-system/backend/CBIT ACC Register- as on 28.08.25.xls"
+    file_path = "C:\\library_management\\backend\CBIT ACC Register- as on 28.08.25.xls"
     
     try:
         xls = pd.ExcelFile(file_path)

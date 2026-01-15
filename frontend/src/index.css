@@ -1,370 +1,444 @@
 /* frontend/src/index.css */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* CRITICAL GLOBAL FIX */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
 :root {
-  --primary: #003366;       /* Deep Navy */
-  --accent: #d4a017;        /* Elegant Gold */
-  --accent-hover: #b8860b;  /* Darker Gold for hover */
-  --glass: rgba(255, 255, 255, 0.98); /* High Opacity White for Clarity */
-  --text-dark: #1a1a1a;     /* Sharp Black-Gray */
-  --shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+  --primary: #002855;       /* A deeper, richer Navy */
+  --primary-dark: #001a3a;
+  --accent: #c5a017;        /* A more metallic, less yellow Gold */
+  --accent-hover: #a8860b;
+  --bg-body: #f0f2f5;       /* Clean light gray background */
+  --text-dark: #2d3748;
+  --text-light: #718096;
+  --white: #ffffff;
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 15px 30px rgba(0, 0, 0, 0.12);
+  --danger: #e53e3e;
+  --success: #38a169;
 }
 
-/* 1. GLOBAL SETTINGS */
-html, body {
+body {
   margin: 0;
-  padding: 0;
-  width: 100%;
-  min-height: 100vh;
   font-family: 'Poppins', sans-serif;
-  color: var(--text-dark);
-  background: #f0f2f5; 
-}
-
-/* 2. BACKGROUND LOGIC */
-.app-wrapper {
-  width: 100%;
-  min-height: 100vh;
-  background: url('/background.png') no-repeat center center fixed;
+  /* Use the uploaded image as fixed background */
+  background: url('/background.png') no-repeat center center fixed; 
   background-size: cover;
-  position: relative;
+  color: var(--text-dark);
+  line-height: 1.6;
 }
 
-/* 3. OVERLAYS */
-/* This darkens the background image slightly so the white cards pop */
-.overlay {
-  width: 100%;
+/* --- LAYOUT --- */
+.app-wrapper {
   min-height: 100vh;
-  background: rgba(0, 20, 40, 0.4); /* Dark Blue Tint */
-  backdrop-filter: blur(4px);       /* Slight blur for focus */
-  padding-bottom: 40px;
-}
-
-/* 4. NAVBAR */
-.navbar {
-  background: rgba(255, 255, 255, 0.95); /* Solid White Navbar */
-  padding: 0.8rem 3rem;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  /* Add a dark overlay so text pops against the busy background */
+  background: rgba(0, 40, 85, 0.85); 
+  backdrop-filter: blur(4px); /* Optional: Blurs the background slightly */
+}
+
+.container {
+  max-width: 1100px;
+  margin: 40px auto;
+  padding: 0 25px;
+  width: 100%;
+}
+/* --- UPDATED NAVBAR --- */
+/* The top logo section */
+.header-logo-container {
+  background: white;
+  padding: 10px 0;
+  text-align: center;
+  border-bottom: 3px solid var(--accent);
+}
+
+.header-logo-img {
+  max-width: 100%;
+  height: auto;
+  max-height: 100px; /* Adjust based on your logo size */
+  object-fit: contain;
+}
+
+/* The Navigation Links Bar */
+.navbar {
+  background: var(--primary); /* Keep the Navy Blue theme */
+  padding: 0.8rem 2rem;
+  display: flex;
+  justify-content: center; /* Center the links */
   align-items: center;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 
-.navbar h2 {
-  color: var(--primary);
-  margin: 0;
-  font-weight: 700;
-  font-size: 1.6rem;
-  letter-spacing: 0.5px;
-}
-
-.nav-links a, .nav-links button {
-  color: #444; /* Dark Grey Links */
-  text-decoration: none;
-  margin-left: 30px;
-  font-weight: 600;
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
-  background: none;
-  border: none;
-  cursor: pointer;
+.nav-links {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .nav-links a:hover {
   color: var(--accent);
 }
 
-/* 5. CARDS (The Content Box) */
-.container {
-  max-width: 1100px;
-  margin: 60px auto;
-  padding: 0 20px;
-}
-
-.glass-card {
-  background: var(--glass); /* Almost solid white */
-  padding: 50px;
+/* --- CLEAN CARD SYSTEM --- */
+/* Replaced "glass" with solid white for better contrast */
+.glass-card, .search-card, .form-card, .book-card {
+  background: var(--white);
   border-radius: 16px;
-  box-shadow: var(--shadow);
-  text-align: left;
-  animation: slideUp 0.6s ease-out;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  padding: 2.5rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(0,0,0,0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(40px); }
-  to { opacity: 1; transform: translateY(0); }
+.glass-card:hover, .book-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
 }
 
-/* HEADINGS (The Welcome Text Fix) */
-.glass-card h1 {
-  color: var(--primary);
-  font-weight: 800; /* Extra Bold */
-  font-size: 2.8rem;
-  margin-bottom: 15px;
-  
-  /* Text Shadow for Maximum Readability */
-  text-shadow: 2px 2px 0px rgba(0,0,0,0.1); 
-  border-bottom: none;
-}
+.search-card { max-width: 800px; margin: 0 auto; text-align: center; }
+.form-card { max-width: 480px; margin: 50px auto; }
 
-.glass-card p {
-  font-size: 1.1rem;
-  line-height: 1.8;
-  color: #555;
-}
-
-/* 6. COOL BUTTONS */
-.btn-gold {
-  background: var(--primary);
+/* Profile Header specific */
+.profile-header-card {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: white;
-  border: none;
-  padding: 14px 40px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 1.1rem;
-  cursor: pointer;
-  box-shadow: 0 5px 15px rgba(0, 51, 102, 0.3);
-  transition: all 0.2s ease;
-}
-
-.btn-gold:hover {
-  transform: translateY(-2px);
-  background: #004080;
-  box-shadow: 0 8px 20px rgba(0, 51, 102, 0.4);
-}
-
-/* 7. CLEAN TABLES */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 30px;
-  background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-}
-
-thead { background: var(--primary); }
-
-thead th {
-  color: white;
-  padding: 18px 20px;
-  text-transform: uppercase;
-  font-size: 0.85rem;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-  text-align: left;
-}
-
-tbody tr {
-  border-bottom: 1px solid #eee;
-  transition: background 0.2s;
-}
-
-tbody tr:hover { background-color: #f0f4f8; }
-
-td {
-  padding: 16px 20px;
-  color: #333;
-  font-size: 0.95rem;
-}
-/* ... keep all previous CSS above ... */
-
-/* 8. MODERN FORMS (Login & Signup) */
-.form-container {
-  max-width: 400px;
-  margin: 80px auto;
-  text-align: center;
-}
-
-/* Make the inputs look like modern app fields */
-input {
-  width: 100%;
-  padding: 15px;
-  margin: 10px 0;
-  border: 1px solid rgba(0,0,0,0.1);
-  border-radius: 50px; /* Fully rounded "Pill" shape */
-  background: #f9f9f9;
-  font-size: 1rem;
-  font-family: 'Poppins', sans-serif;
-  outline: none;
-  transition: all 0.3s ease;
-  box-sizing: border-box; /* Fixes padding issues */
-}
-
-input:focus {
-  background: #fff;
-  border-color: var(--primary);
-  box-shadow: 0 4px 15px rgba(0, 51, 102, 0.15); /* Soft glow on focus */
-}
-
-/* Style the Form Card specifically */
-.form-card {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 40px;
-  border-radius: 20px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-}
-
-.form-card h2 {
-  color: var(--primary);
-  margin-bottom: 20px;
-  font-weight: 700;
-}
-
-/* Make the Login/Signup buttons wide and round */
-.form-btn {
-  width: 100%;
-  padding: 15px;
-  border-radius: 50px;
-  margin-top: 20px;
-  background: var(--primary);
-  color: white;
-  font-size: 1.1rem;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  transition: transform 0.2s;
-  box-shadow: 0 5px 15px rgba(0, 51, 102, 0.3);
-}
-
-.form-btn:hover {
-  transform: scale(1.02);
-  background: #004080;
-}
-/* ... keep all previous CSS ... */
-
-/* 9. DETAILED & MODERN FORMS */
-.form-container {
-  max-width: 450px;
-  margin: 60px auto;
-  perspective: 1000px; /* For 3D effects */
-}
-
-.form-card {
-  background: rgba(255, 255, 255, 0.9); /* High visibility glass */
-  padding: 50px 40px;
-  border-radius: 20px;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  text-align: left; /* Aligns labels to the left */
-}
-
-.form-header {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.form-header h2 {
-  color: var(--primary);
-  font-size: 2rem;
-  margin-bottom: 10px;
-  font-weight: 700;
-}
-
-.form-header p {
-  color: #666;
-  font-size: 0.95rem;
-}
-
-/* INPUT GROUPS (Label + Icon + Field) */
-.input-group {
-  margin-bottom: 20px;
+  border-radius: 16px;
+  padding: 2.5rem;
+  box-shadow: var(--shadow-lg);
   position: relative;
+  overflow: hidden;
+  margin-bottom: 35px;
 }
+
+/* Cleaner decorative circle */
+.profile-header-card::after {
+  content: "";
+  position: absolute;
+  top: -80px;
+  right: -80px;
+  width: 250px;
+  height: 250px;
+  background: var(--accent);
+  opacity: 0.12;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* --- FORMS & INPUTS --- */
+.input-group { margin-bottom: 1.5rem; text-align: left; }
 
 .form-label {
   display: block;
-  font-size: 0.9rem;
-  color: #444;
+  font-size: 0.85rem;
   font-weight: 600;
+  color: var(--text-dark);
   margin-bottom: 8px;
-  margin-left: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.input-wrapper {
+.input-wrapper { position: relative; display: flex; align-items: center; width: 100%; }
+.input-icon { position: absolute; left: 15px; font-size: 1.1rem; color: var(--text-light); z-index: 2; }
+
+.modern-input, .modern-select {
+  width: 100%;
+  padding: 12px 15px 12px 45px; /* Padding for icon */
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 1rem;
+  transition: 0.3s;
+  background: white;
+  font-family: inherit;
+  color: var(--text-dark);
+}
+
+.modern-input:focus, .modern-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 40, 85, 0.1);
+  outline: none;
+}
+
+/* Edit Inputs inside Profile (Dark Background) */
+.edit-input {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: white;
+  padding: 10px 12px;
+  border-radius: 8px;
+  width: 100%;
+  font-family: inherit;
+}
+.edit-input:focus { background: rgba(255,255,255,0.2); outline: none; border-color: var(--accent); }
+.edit-input.disabled { background: rgba(0,0,0,0.25); color: #aaa; border: none; cursor: not-allowed; }
+
+/* File Upload Input styling */
+.file-upload-label {
+  display: inline-block;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.1);
+  border: 1px dashed rgba(255,255,255,0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  transition: all 0.2s;
+}
+.file-upload-label:hover { background: rgba(255,255,255,0.2); border-color: var(--accent); }
+
+/* --- BUTTONS --- */
+.btn-gold, .form-btn {
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: white;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(197, 160, 23, 0.3);
+}
+
+.form-btn { width: 100%; font-size: 1.05rem; }
+
+.btn-gold:hover, .form-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(197, 160, 23, 0.4);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.btn-danger:hover { background: #c53030; }
+
+/* --- PROFILE GRID (Fixed Layout) --- */
+.profile-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Creates columns automatically */
+  gap: 30px; /* Space between columns */
+  margin-top: 35px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2); /* Separator line */
+}
+
+/* The individual field container */
+.detail-item {
+  display: flex;
+  flex-direction: column; /* CRITICAL: This stacks Label on top of Value */
+  align-items: flex-start;
+}
+
+/* The Label (e.g. "FULL NAME") */
+.detail-item label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7); /* Light transparent white */
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px; /* Space between label and text */
+  font-weight: 500;
+  display: block;
+}
+
+/* The Value (e.g. "Rahul Sharma") */
+.detail-item span {
+  font-size: 1.1rem;
+  color: #ffffff; /* Pure white text */
+  font-weight: 600;
+  display: block;
+  line-height: 1.4;
+}
+
+/* Edit Inputs inside Profile */
+.edit-input {
+  background: rgba(0, 0, 0, 0.2); /* Darker background for inputs */
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 10px 12px;
+  border-radius: 8px;
+  width: 100%;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.edit-input:focus {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* Disabled inputs (like Email) */
+.edit-input.disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+  border: none;
+  cursor: not-allowed;
+}
+
+/* Profile Header Card tweak for better spacing */
+.profile-header-card {
+  background: linear-gradient(135deg, var(--primary), #001a3a);
+  color: white;
+  border-radius: 20px;
+  padding: 3rem; /* More internal spacing */
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
   position: relative;
+  overflow: hidden;
+  margin-bottom: 40px;
+}
+.profile-img-large {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  border: 4px solid var(--accent);
+  object-fit: cover;
+  background: white;
+  box-shadow: var(--shadow-lg);
+}
+
+/* --- BOOKS GRID & TABLES --- */
+.books-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 25px;
+}
+
+.book-card {
+  padding: 25px;
+  border-left: 5px solid var(--accent);
+  position: relative;
+}
+
+.status-badge {
+  position: absolute;
+  top: 20px; right: 20px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-issued { background: #e3f2fd; color: var(--primary); }
+.status-requested { background: #fff8e1; color: #947600; }
+.status-returned { background: #d4edda; color: #155724; }
+.status-overdue { background: #fed7d7; color: #9b2c2c; }
+
+table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
+th { background: var(--primary); color: white; padding: 18px; text-align: left; font-weight: 600; letter-spacing: 0.5px; }
+td { padding: 18px; border-bottom: 1px solid #eee; vertical-align: middle; color: var(--text-dark); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f9fafb; }
+/* --- PREMIUM PROFILE PICTURE STYLES --- */
+
+/* 1. The Container (Creates the Gradient Ring) */
+.profile-img-container {
+  position: relative;
+  width: 160px;       /* Fixed size */
+  height: 160px;
+  margin-right: 30px; /* Space from text */
+  border-radius: 50%;
+  
+  /* The "Ring" Effect */
+  padding: 5px; 
+  background: linear-gradient(135deg, var(--accent), #fff, var(--accent)); 
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4); /* Deep shadow for depth */
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+/* 2. The Actual Image */
+.profile-img-large {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #fff; /* Inner white border */
+  background: white;
+  display: block;
+}
+
+/* 3. The "Edit Mode" Overlay (Hidden by default) */
+.img-overlay {
+  position: absolute;
+  top: 5px; left: 5px; right: 5px; bottom: 5px; /* Matches inner image size */
+  background: rgba(0, 0, 0, 0.6); /* Dark tint */
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  
+  opacity: 0; /* Hidden */
+  transition: opacity 0.3s ease;
+  cursor: pointer;
+  border: 4px solid transparent; 
+}
+
+/* Show overlay ONLY when hovering AND in Edit Mode */
+.profile-img-container:hover .img-overlay.visible {
+  opacity: 1;
+}
+
+.camera-icon {
+  font-size: 2rem;
+  margin-bottom: 5px;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5));
+}
+
+.overlay-text {
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+/* frontend/src/index.css */
+
+/* ... keep your existing code ... */
+
+/* PASSWORD TOGGLE STYLES */
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
   display: flex;
   align-items: center;
 }
 
-/* The Icon inside the input */
-.input-icon {
+.password-input-wrapper input {
+  width: 100%;
+  padding-right: 45px; /* Make space for the eye icon so text doesn't overlap */
+}
+
+.password-toggle-btn {
   position: absolute;
-  left: 15px;
-  font-size: 1.1rem;
-  color: var(--primary);
-  opacity: 0.6;
-  z-index: 2;
-}
-
-/* The Field itself */
-.modern-input {
-  width: 100%;
-  padding: 14px 15px 14px 45px; /* Left padding makes room for icon */
-  border: 2px solid #e1e5ee;
-  border-radius: 12px; /* Soft square, not full pill */
-  background: #f8faff;
-  font-size: 1rem;
-  font-family: 'Poppins', sans-serif;
-  transition: all 0.3s ease;
-  color: #333;
-}
-
-.modern-input:focus {
-  border-color: var(--primary);
-  background: white;
-  box-shadow: 0 0 0 4px rgba(0, 51, 102, 0.1); /* Blue glow ring */
-  outline: none;
-}
-
-/* Dropdown specific */
-.modern-select {
-  appearance: none; /* Removes default arrow */
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23003366' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 15px center;
-  background-size: 15px;
-}
-
-/* BUTTONS */
-.form-btn {
-  width: 100%;
-  padding: 15px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--primary), #004080);
-  color: white;
-  font-size: 1.1rem;
-  font-weight: 600;
+  right: 15px;
+  background: none;
   border: none;
   cursor: pointer;
-  box-shadow: 0 10px 20px rgba(0, 51, 102, 0.2);
-  transition: transform 0.2s, box-shadow 0.2s;
-  margin-top: 10px;
+  font-size: 1.2rem;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  padding: 0;
+  display: flex;
+  align-items: center;
 }
 
-.form-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 15px 30px rgba(0, 51, 102, 0.3);
-}
-
-/* LINKS (Forgot Pass, etc) */
-.form-footer {
-  text-align: center;
-  margin-top: 25px;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.form-link {
-  color: var(--primary);
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.form-link:hover {
-  text-decoration: underline;
-  color: var(--accent-hover);
+.password-toggle-btn:hover {
+  opacity: 1;
 }

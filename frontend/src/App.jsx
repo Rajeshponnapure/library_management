@@ -5,13 +5,18 @@ import Signup from './Signup';
 import Profile from './Profile';
 import Home from './Home';
 import Books from './Books';
+import AdminBooks from './AdminBooks';
 import AdminDashboard from './AdminDashboard'; 
 import './index.css';
+import ForgotPassword from './ForgotPassword'; // <--- Import
+import ResetPassword from './ResetPassword';   // <--- Import
+
+// frontend/src/App.jsx
+// ... imports remain the same ...
 
 function App() {
   const role = localStorage.getItem('role');
   const isLoggedIn = !!localStorage.getItem('token');
-  const location = useLocation();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -21,46 +26,51 @@ function App() {
 
   return (
     <div className="app-wrapper">
-      {/* The Overlay creates the cool dark-blue tint over the image */}
-      <div className="overlay">
-        
-        <nav className="navbar">
-          <div style={{display:'flex', alignItems:'center', cursor:'pointer'}} onClick={()=>navigate('/')}>
-              <h2>CBIT Library</h2>
-          </div>
-          <div className="nav-links">
-            <Link to="/">Home</Link>
-            <Link to="/books">Search Books</Link>
-            
-            {role === 'admin' && (
-              <Link to="/admin" style={{color:'#FFD700'}}>Admin Dashboard</Link>
-            )}
+      
+      {/* 1. NEW LOGO HEADER (White Background) */}
+      <header className="header-logo-container">
+        <div className="container" style={{margin: '0 auto', padding: '0 10px'}}>
+             <img src="/public/header_logo.png" alt="CBIT Library Header" className="header-logo-img" />
+        </div>
+      </header>
 
+      {/* 2. NAVIGATION BAR (Blue Background) */}
+      <nav className="navbar">
+        <div className="nav-links">
+            <Link to="/">Home</Link>
+            
+            {/* Role-based Links */}
+            {role === 'admin' ? (
+                <Link to="/admin/books" style={{color:'#d4a017'}}>Manage Books</Link>
+            ) : (
+                <Link to="/books">Search Books</Link>
+            )}
+            
+            {role === 'admin' && <Link to="/admin">Dashboard</Link>}
             {role === 'student' && <Link to="/profile">My Profile</Link>}
 
+            {/* Login/Logout */}
             {isLoggedIn ? (
-              <button onClick={handleLogout} className="btn-gold" style={{marginLeft:'20px'}}>Logout</button>
+              <button onClick={handleLogout} className="btn-gold" style={{marginLeft:'20px', padding: '5px 15px', fontSize:'0.9rem'}}>Logout</button>
             ) : (
-              <>
-                  <Link to="/login">Login</Link>
-                  <Link to="/signup">
-                    <button className="btn-gold" style={{marginLeft:'10px', padding: '8px 20px', fontSize:'0.9rem'}}>Sign Up</button>
-                  </Link>
-              </>
+              <Link to="/login"><button className="btn-gold" style={{marginLeft:'10px', padding: '5px 15px', fontSize:'0.9rem'}}>Login</button></Link>
             )}
-          </div>
-        </nav>
+        </div>
+      </nav>
 
-        <Routes>
+      {/* 3. MAIN CONTENT */}
+      <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/books" element={<Books />} />
+          <Route path="/admin/books" element={<AdminBooks />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<AdminDashboard />} />
-        </Routes>
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+      </Routes>
 
-      </div>
     </div>
   );
 }

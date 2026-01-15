@@ -1,231 +1,477 @@
 # backend/main.py
-from fastapi import FastAPI, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from datetime import date, timedelta, datetime
-import models, database
-from passlib.context import CryptContext
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel 
-from typing import Optional
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from contextlib import asynccontextmanager
+from fastapi.staticfiles import StaticFiles # --- NEW IMPORT ---
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from datetime import date, timedelta,datetime
+from passlib.context import CryptContext
+from pydantic import BaseModel
+from typing import Optional, List
+from jose import jwt, JWTError
+import models, database
 import os
+import shutil # --- NEW IMPORT for saving files ---
 from dotenv import load_dotenv
+import time
 
-# --- 0. CONFIGURATION ---
-load_dotenv() 
-
-SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_key")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
-
-# Initialize Database Tables
-# IMPORTANT: If you changed models.py, delete library.db before running this!
+# --- SETUP ---
+load_dotenv()
 models.Base.metadata.create_all(bind=database.engine)
 
-# --- 1. SETUP LIFESPAN ---
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup Logic: Create Default Admin
-    db = database.SessionLocal()
-    try:
-        admin = db.query(models.User).filter(models.User.email == "admin@cbit.edu.in").first()
-        if not admin:
-            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-            hashed_pw = pwd_context.hash("admin123")
-            new_admin = models.User(
-                email="admin@cbit.edu.in",
-                hashed_password=hashed_pw,
-                role="admin",
-                full_name="Chief Librarian",
-                max_tokens=0 
-            )
-            db.add(new_admin)
-            db.commit()
-            print("--- Default Admin Created (admin@cbit.edu.in / admin123) ---")
-    finally:
-        db.close()
-    yield 
-    print("Server is shutting down...")
+app = FastAPI()
 
-# --- 2. CREATE APP & CORS ---
-app = FastAPI(lifespan=lifespan)
+# --- NEW: SETUP UPLOADS DIRECTORY ---
+UPLOAD_DIR = "uploads"
+# Create dir if it doesn't exist
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+# Mount it so files can be accessed via http://localhost:8000/uploads/filename.jpg
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-origins = ["http://localhost:5173", "http://localhost:3000"]
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
+ALGORITHM = "HS256"
+
+# Allow both localhost variations
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-
-# --- 3. SECURITY TOOLS ---
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def get_db():
     db = database.SessionLocal()
-    try: yield db
-    finally: db.close()
+    try:
+        yield db
+    finally:
+        db.close()
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+# --- AUTH HELPERS ---
+from fastapi.security import OAuth2PasswordBearer
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now() + expires_delta
+    else:
+        # FIX IS HERE: Removed 'database.' prefix
+        expire = datetime.now() + timedelta(minutes=60) 
+        
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
-        if email is None: raise HTTPException(status_code=401, detail="Invalid credentials")
+        if email is None: raise HTTPException(status_code=401, detail="Invalid token")
     except JWTError:
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
     user = db.query(models.User).filter(models.User.email == email).first()
     if user is None: raise HTTPException(status_code=401, detail="User not found")
     return user
 
-# --- 4. PYDANTIC MODELS (VALIDATION) ---
+# --- SCHEMAS ---
 class UserCreate(BaseModel):
+    full_name: str
     email: str
     password: str
-    full_name: str
     role: str
+    mobile_number: str
     registration_number: Optional[str] = None
     branch: Optional[str] = None
     year: Optional[str] = None
 
-# New model for adding books
-class BookCreate(BaseModel):
-    title: str
-    author: str
-    acc_no: str
-    department: str
-    total_copies: int
+# NOTE: UserUpdate is still used for text updates
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    registration_number: Optional[str] = None
+    branch: Optional[str] = None
+    year: Optional[str] = None
+    mobile_number: Optional[str] = None
+    # photo_url is removed here, handled by dedicated endpoint
 
-# ===========================
-# === API ENDPOINTS ===
-# ===========================
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
-# --- A. AUTH (Signup/Login) ---
+class IssueRequest(BaseModel):
+    student_email: str
+    book_acc_no: str
+
+# --- ENDPOINTS ---
+
 @app.post("/signup", status_code=status.HTTP_201_CREATED)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    # --- SECURITY: RESTRICT TO COLLEGE DOMAIN ---
+    ALLOWED_DOMAIN = "@cbit.edu.in"  # <--- Update this if needed
+    
+    if not user.email.endswith(ALLOWED_DOMAIN):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Restricted Access: Only {ALLOWED_DOMAIN} emails are allowed."
+        )
+    # ---------------------------------------------
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
+    hashed_password = pwd_context.hash(user.password)
     token_limit = 10 if user.role.lower() == "faculty" else 3
+
     new_user = models.User(
-        email=user.email, hashed_password=pwd_context.hash(user.password),
-        full_name=user.full_name, role=user.role.lower(), max_tokens=token_limit, 
-        registration_number=user.registration_number, branch=user.branch, year=user.year
+        email=user.email,
+        hashed_password=hashed_password,
+        full_name=user.full_name,
+        role=user.role.lower(),
+        mobile_number=user.mobile_number, 
+        max_tokens=token_limit,
+        registration_number=user.registration_number,
+        branch=user.branch,
+        year=user.year
     )
     db.add(new_user)
     db.commit()
     return {"message": "Account created successfully"}
 
-@app.post("/token")
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == form_data.username).first()
-    if not user or not pwd_context.verify(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
+@app.post("/login")
+def login(request: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == request.email).first()
+    if not user or not pwd_context.verify(request.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
     
-    access_token = create_access_token(data={"sub": user.email, "role": user.role, "id": user.id})
-    return {"access_token": access_token, "token_type": "bearer", "role": user.role}
+    access_token = create_access_token(data={"sub": user.email, "role": user.role})
+    return {
+        "access_token": access_token, 
+        "user_id": user.id, 
+        "role": user.role, 
+        "full_name": user.full_name,
+        "photo_url": user.photo_url
+    }
 
-@app.get("/books/search/")
-def search_books(query: str, db: Session = Depends(get_db)):
-    print(f"🔍 Searching for: '{query}'") 
+# backend/main.py
 
-    raw_books = db.query(models.Book).filter(
-        (models.Book.title.contains(query)) |
-        (models.Book.author.contains(query)) |
-        (models.Book.acc_no.contains(query)) |
-        (models.Book.department.contains(query))
+@app.get("/users/me")
+def read_users_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # 1. Get Active Loans (Borrowed Books)
+    loans = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id,
+        models.Transaction.return_date == None
+    ).all()
+    
+    loan_data = []
+    for loan in loans:
+        book = db.query(models.Book).filter(models.Book.id == loan.book_id).first()
+        fine = 0.0
+        if date.today() > loan.due_date and current_user.role == "student":
+            days = (date.today() - loan.due_date).days
+            fine = days * 5.0
+
+        loan_data.append({
+            "transaction_id": loan.id,
+            "title": book.title,
+            "acc_no": book.acc_no,
+            "issue_date": loan.issue_date,
+            "due_date": loan.due_date,
+            "status": loan.status,
+            "fine_est": fine
+        })
+
+    # 2. Get Pending Requests (NEW)
+    requests = db.query(models.RentRequest).filter(
+        models.RentRequest.user_id == current_user.id,
+        models.RentRequest.status == "pending"
     ).all()
 
-    grouped_books = {}
+    request_data = []
+    for req in requests:
+        book = db.query(models.Book).filter(models.Book.id == req.book_id).first()
+        request_data.append({
+            "request_id": req.id,
+            "title": book.title,
+            "acc_no": book.acc_no,
+            "request_date": req.request_date,
+            "status": "Pending Approval"
+        })
+
+    return {
+        "id": current_user.id,
+        "full_name": current_user.full_name,
+        "email": current_user.email,
+        "role": current_user.role,
+        "mobile_number": current_user.mobile_number,
+        "registration_number": current_user.registration_number,
+        "branch": current_user.branch,
+        "year": current_user.year,
+        "photo_url": current_user.photo_url,
+        "max_tokens": current_user.max_tokens,
+        "active_loans": loan_data,
+        "pending_requests": request_data # <--- Sending this to Frontend
+    }
+
+# --- EXISTING TEXT UPDATE ENDPOINT ---
+@app.put("/users/me")
+def update_user_me(user_update: UserUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user_update.full_name: current_user.full_name = user_update.full_name
+    if user_update.registration_number: current_user.registration_number = user_update.registration_number
+    if user_update.branch: current_user.branch = user_update.branch
+    if user_update.year: current_user.year = user_update.year
+    if user_update.mobile_number: current_user.mobile_number = user_update.mobile_number
+    # photo_url update removed from here
     
-    for book in raw_books:
-        clean_title = book.title.strip().lower() if book.title else ""
-        clean_author = book.author.strip().lower() if book.author else ""
-        key = (clean_title, clean_author)
-        
-        if key not in grouped_books:
-            grouped_books[key] = {
-                "id": book.id,
-                "title": book.title,
-                "author": book.author,
-                "acc_no": book.acc_no,
-                "total_copies": 0,
-                "available_copies": 0
-            }
-        
-        # --- NEW LOGIC: Sum the values from the DB ---
-        # Before we added +1. Now we add the ACTUAL 'total_copies' stored in the row.
-        grouped_books[key]["total_copies"] += book.total_copies
-        grouped_books[key]["available_copies"] += book.available_copies
-        
-        if book.available_copies > 0:
-            grouped_books[key]["id"] = book.id 
-            grouped_books[key]["acc_no"] = book.acc_no
+    db.commit()
+    db.refresh(current_user)
+    return current_user
 
-    return list(grouped_books.values())
+# 1. UPDATED PHOTO UPLOAD (Fixes 304 Cache Issue)
+@app.post("/users/me/photo")
+async def upload_photo(
+    file: UploadFile = File(...), 
+    current_user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(400, detail="File must be an image")
 
-# ==========================================
-# === NEW: STUDENT/FACULTY REQUEST FLOW ===
-# ==========================================
+    # Generate Unique Filename with Timestamp
+    file_extension = os.path.splitext(file.filename)[1]
+    timestamp = int(time.time()) 
+    new_filename = f"user_{current_user.id}_{timestamp}{file_extension}" # <--- Unique Name
+    
+    file_path = os.path.join(UPLOAD_DIR, new_filename)
 
+    # Delete old photo if it exists to save space (Optional logic)
+    if current_user.photo_url:
+        try:
+            old_filename = current_user.photo_url.split("/")[-1]
+            old_path = os.path.join(UPLOAD_DIR, old_filename)
+            if os.path.exists(old_path):
+                os.remove(old_path)
+        except:
+            pass # Ignore errors deletion errors
+
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+         raise HTTPException(500, detail=f"Could not save file: {e}")
+
+    full_url = f"http://127.0.0.1:8000/{UPLOAD_DIR}/{new_filename}"
+    current_user.photo_url = full_url
+    db.commit()
+    
+    return {"photo_url": full_url}
+
+
+# --- BOOK SEARCH ---
+@app.get("/books/search/")
+def search_books(query: str, db: Session = Depends(get_db)):
+    books = db.query(models.Book).filter(
+        (models.Book.title.contains(query)) |
+        (models.Book.author.contains(query)) |
+        (models.Book.acc_no.contains(query))|
+        (models.Book.department.contains(query))
+    ).all()
+    return books
+
+# --- ADMIN ISSUE ---
+@app.post("/admin/issue-book")
+def issue_book(request: IssueRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    user = db.query(models.User).filter(models.User.email == request.student_email).first()
+    book = db.query(models.Book).filter(models.Book.acc_no == request.book_acc_no).first()
+
+    if not user: raise HTTPException(status_code=404, detail="Student email not found")
+    if not book: raise HTTPException(status_code=404, detail="Book Accession No not found")
+    if book.available_copies < 1: raise HTTPException(status_code=400, detail="Book out of stock")
+
+    active_issues = db.query(models.Transaction).filter(
+        models.Transaction.user_id == user.id, 
+        models.Transaction.return_date == None
+    ).count()
+
+    if active_issues >= user.max_tokens:
+        raise HTTPException(status_code=400, detail=f"User limit reached ({user.max_tokens})")
+
+    days = 30 if user.role == "faculty" else 15
+    due = date.today() + timedelta(days=days)
+
+    new_issue = models.Transaction(
+        user_id=user.id, book_id=book.id,
+        issue_date=date.today(), due_date=due, status="Issued"
+    )
+    
+    book.available_copies -= 1
+    db.add(new_issue)
+    db.commit()
+    return {"message": "Success", "book": book.title, "student": user.full_name, "due_date": due}
+
+# --- RETURN LOGIC ---
+
+@app.post("/user/return-request/{transaction_id}")
+def request_return(transaction_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    txn = db.query(models.Transaction).filter(
+        models.Transaction.id == transaction_id,
+        models.Transaction.user_id == current_user.id
+    ).first()
+
+    if not txn: raise HTTPException(status_code=404, detail="Transaction not found")
+    if txn.status != "Issued": raise HTTPException(status_code=400, detail="Return already requested or completed")
+
+    txn.status = "Return Requested"
+    db.commit()
+    return {"message": "Return request sent to Admin"}
+
+# --- UPDATED: Admin Stats with Inventory Counts ---
+@app.get("/admin/dashboard-stats")
+def get_admin_stats(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "admin": raise HTTPException(status_code=403, detail="Admin only")
+
+    # 1. COUNTERS
+    total_books_count = db.query(models.Book).count()
+    books_lent_count = db.query(models.Transaction).filter(models.Transaction.return_date == None).count()
+    total_available_copies = db.query(func.sum(models.Book.available_copies)).scalar() or 0
+
+    # 2. INCOMING BORROW REQUESTS (RentRequest Table)
+    borrow_requests = db.query(models.RentRequest).filter(models.RentRequest.status == "pending").all()
+    borrow_data = []
+    for req in borrow_requests:
+        borrow_data.append({
+            "request_id": req.id,
+            "student_name": req.user.full_name,
+            "student_photo": req.user.photo_url,
+            "student_reg": req.user.registration_number,
+            "book_title": req.book.title,
+            "book_acc_no": req.book.acc_no,
+            "request_date": req.request_date
+        })
+
+    # 3. RETURN REQUESTS (Transaction Table with status 'Return Requested')
+    return_requests = db.query(models.Transaction).filter(models.Transaction.status == "Return Requested").all()
+    return_data = []
+    for txn in return_requests:
+        return_data.append({
+            "request_id": txn.id,
+            "student_name": txn.borrower.full_name,
+            "student_photo": txn.borrower.photo_url,
+            "student_reg": txn.borrower.registration_number,
+            "book_title": txn.book.title,
+            "book_acc_no": txn.book.acc_no,
+            "due_date": txn.due_date
+        })
+
+    # 4. ACTIVE ISSUED LOANS (Transaction Table with status 'Issued')
+    active = db.query(models.Transaction).filter(models.Transaction.status == "Issued").all()
+    active_data = []
+    for loan in active:
+        fine = 0.0
+        if date.today() > loan.due_date and loan.borrower.role == "student":
+            days = (date.today() - loan.due_date).days
+            fine = days * 5.0
+            
+        active_data.append({
+            "transaction_id": loan.id,
+            "student_name": loan.borrower.full_name,
+            "student_email": loan.borrower.email,
+            "student_mobile": loan.borrower.mobile_number,
+            "student_branch": loan.borrower.branch,
+            "student_year": loan.borrower.year,
+            "student_photo": loan.borrower.photo_url,
+            "student_reg": loan.borrower.registration_number,
+            "book_title": loan.book.title,
+            "book_acc_no": loan.book.acc_no,
+            "issue_date": loan.issue_date,
+            "due_date": loan.due_date,
+            "fine_est": fine
+        })
+
+    return {
+        "total_books": total_books_count,
+        "books_lent": books_lent_count,
+        "available_copies": total_available_copies,
+        "borrow_requests": borrow_data, # NEW
+        "return_requests": return_data, # NEW
+        "active_loans": active_data
+    }
+@app.post("/admin/approve-return/{transaction_id}")
+def approve_return(transaction_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "admin": raise HTTPException(status_code=403, detail="Admin only")
+    
+    txn = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    if not txn: raise HTTPException(status_code=404, detail="Transaction not found")
+
+    user = db.query(models.User).filter(models.User.id == txn.user_id).first()
+    
+    # Calculate Fine
+    fine = 0.0
+    if date.today() > txn.due_date and user.role == "student":
+        days = (date.today() - txn.due_date).days
+        fine = days * 5.0
+
+    txn.return_date = date.today()
+    txn.status = "Returned"
+    txn.fine_amount = fine
+    
+    # Restock Book
+    book = db.query(models.Book).filter(models.Book.id == txn.book_id).first()
+    book.available_copies += 1
+    
+    db.commit()
+    return {"message": "Return Approved", "fine": fine}
+# --- ADD THESE MISSING ENDPOINTS TO backend/main.py ---
+
+# 1. STUDENT: Request a Book
 @app.post("/request-book/{book_id}")
 def request_book(book_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # 1. Check if book exists and has stock
+    # Check if book exists
     book = db.query(models.Book).filter(models.Book.id == book_id).first()
-    if not book or book.available_copies < 1:
-        raise HTTPException(status_code=400, detail="Book unavailable or out of stock")
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    if book.available_copies < 1:
+        raise HTTPException(status_code=400, detail="Book is out of stock")
 
-    # 2. Check if user already requested this specific book pending
-    existing_req = db.query(models.RentRequest).filter(
+    # Check if already requested
+    existing = db.query(models.RentRequest).filter(
         models.RentRequest.user_id == current_user.id,
         models.RentRequest.book_id == book_id,
-        models.RentRequest.status == models.RequestStatus.PENDING
+        models.RentRequest.status == "pending" # Make sure 'pending' matches your Enum or string
     ).first()
-    if existing_req:
-         raise HTTPException(status_code=400, detail="You already have a pending request for this book")
 
-    # 3. Check Token Limits (Active Loans + Pending Requests)
-    active_loans = db.query(models.Transaction).filter(
-        models.Transaction.user_id == current_user.id, models.Transaction.return_date == None
-    ).count()
-    
-    pending_requests = db.query(models.RentRequest).filter(
-        models.RentRequest.user_id == current_user.id, models.RentRequest.status == models.RequestStatus.PENDING
-    ).count()
+    if existing:
+        raise HTTPException(status_code=400, detail="You have already requested this book")
 
-    if (active_loans + pending_requests) >= current_user.max_tokens:
-        raise HTTPException(status_code=400, detail=f"Token limit reached ({current_user.max_tokens} max allowed)")
-
-    # 4. Create Request
+    # Create Request
     new_request = models.RentRequest(
         user_id=current_user.id,
-        book_id=book.id,
+        book_id=book_id,
         request_date=date.today(),
-        status=models.RequestStatus.PENDING
+        status="pending"
     )
     db.add(new_request)
     db.commit()
-    return {"message": "Book request sent successfully. Waiting for admin approval."}
+    return {"message": "Request sent successfully! Wait for Admin approval."}
 
-
-# ==========================================
-# === NEW: ADMIN DASHBOARD APIS ===
-# ==========================================
-
-# 1. VIEW ALL PENDING REQUESTS
+# 2. ADMIN: View Pending Requests
 @app.get("/admin/requests/pending")
 def get_pending_requests(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != 'admin': raise HTTPException(status_code=403, detail="Not authorized")
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    requests = db.query(models.RentRequest).filter(models.RentRequest.status == "pending").all()
     
-    requests = db.query(models.RentRequest).filter(models.RentRequest.status == models.RequestStatus.PENDING).all()
-    
-    # Format data nicely for frontend
     data = []
     for req in requests:
         data.append({
@@ -238,108 +484,67 @@ def get_pending_requests(current_user: models.User = Depends(get_current_user), 
         })
     return data
 
-# 2. APPROVE A REQUEST
+# 3. ADMIN: Approve Request
 @app.post("/admin/requests/{request_id}/approve")
 def approve_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != 'admin': raise HTTPException(status_code=403, detail="Not authorized")
-    
+    if current_user.role != "admin": raise HTTPException(status_code=403, detail="Admin access required")
+
     req = db.query(models.RentRequest).filter(models.RentRequest.id == request_id).first()
-    if not req or req.status != models.RequestStatus.PENDING:
-         raise HTTPException(status_code=404, detail="Pending request not found")
+    if not req: raise HTTPException(status_code=404, detail="Request not found")
 
-    # Double check stock before final approval
     if req.book.available_copies < 1:
-        raise HTTPException(status_code=400, detail="Cannot approve: Book is now out of stock")
+        raise HTTPException(status_code=400, detail="Book is out of stock")
 
-    # Create final transaction
-    days_allowed = 15 if req.user.role == "student" else 30
+    # Create the Transaction (Issue the book)
+    days = 15 if req.user.role == 'student' else 30
     new_txn = models.Transaction(
         user_id=req.user_id,
         book_id=req.book_id,
         issue_date=date.today(),
-        due_date=date.today() + timedelta(days=days_allowed)
+        due_date=date.today() + timedelta(days=days),
+        status="Issued"
     )
-    
-    # Update stock and request status
+
+    # Update Request Status & Stock
+    req.status = "approved"
     req.book.available_copies -= 1
-    req.status = models.RequestStatus.APPROVED
     
     db.add(new_txn)
     db.commit()
-    return {"message": f"Request approved. Book issued to {req.user.full_name}"}
+    return {"message": "Request Approved & Book Issued"}
 
-# 3. REJECT A REQUEST
+# 4. ADMIN: Reject Request
 @app.post("/admin/requests/{request_id}/reject")
 def reject_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != 'admin': raise HTTPException(status_code=403, detail="Not authorized")
-    
+    if current_user.role != "admin": raise HTTPException(status_code=403, detail="Admin access required")
+
     req = db.query(models.RentRequest).filter(models.RentRequest.id == request_id).first()
-    if not req or req.status != models.RequestStatus.PENDING:
-         raise HTTPException(status_code=404, detail="Pending request not found")
+    if not req: raise HTTPException(status_code=404, detail="Request not found")
 
-    req.status = models.RequestStatus.REJECTED
+    req.status = "rejected"
     db.commit()
-    return {"message": "Request rejected"}
-
-
-# ==========================================
-# === NEW: ADMIN BOOK MANAGEMENT ===
-# ==========================================
-
-@app.post("/admin/books/add")
-def add_new_book(book: BookCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return {"message": "Request Rejected"}
+# --- NEW: User Management Endpoint ---
+@app.get("/admin/users")
+def get_all_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if current_user.role != 'admin': raise HTTPException(status_code=403, detail="Not authorized")
     
-    if db.query(models.Book).filter(models.Book.acc_no == book.acc_no).first():
-        raise HTTPException(status_code=400, detail="Accession Number already exists")
-
-    new_book = models.Book(
-        title=book.title, author=book.author, acc_no=book.acc_no,
-        department=book.department, total_copies=book.total_copies, available_copies=book.total_copies
-    )
-    db.add(new_book)
-    db.commit()
-    return {"message": f"Book '{book.title}' added successfully"}
-
-@app.delete("/admin/books/delete/{acc_no}")
-def delete_book(acc_no: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != 'admin': raise HTTPException(status_code=403, detail="Not authorized")
-    
-    book = db.query(models.Book).filter(models.Book.acc_no == acc_no).first()
-    if not book: raise HTTPException(status_code=404, detail="Book not found")
-    
-    #Prevent deleting books that are currently issued or have pending requests
-    active_txns = db.query(models.Transaction).filter(models.Transaction.book_id == book.id, models.Transaction.return_date == None).count()
-    pending_reqs = db.query(models.RentRequest).filter(models.RentRequest.book_id == book.id, models.RentRequest.status == models.RequestStatus.PENDING).count()
-
-    if active_txns > 0 or pending_reqs > 0:
-         raise HTTPException(status_code=400, detail="Cannot delete book while it is issued or has pending requests.")
-
-    db.delete(book)
-    db.commit()
-    return {"message": f"Book {acc_no} deleted successfully"}
-
-# --- KEEPING PROFILE & RETURN APIS (for now) ---
-@app.get("/users/me")
-def read_users_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # ... (Same logic as before for fetching active loans) ...
-    # (I've omitted the detailed body to save space, but it's the same logic as the previous main.py for this function)
-    active_issues = db.query(models.Transaction).filter(models.Transaction.user_id == current_user.id, models.Transaction.return_date == None).all()
-    my_books = []
-    for txn in active_issues:
-        fine = 0.0
-        if date.today() > txn.due_date and current_user.role == "student":
-             fine = (date.today() - txn.due_date).days * 5.0
-        my_books.append({"title": txn.book.title, "acc_no": txn.book.acc_no, "issue_date": txn.issue_date, "due_date": txn.due_date, "fine_est": fine})
-    return {"full_name": current_user.full_name, "email": current_user.email, "role": current_user.role, "tokens_total": current_user.max_tokens, "tokens_used": len(active_issues), "active_loans": my_books}
-
-@app.post("/return-book/")
-def return_book(transaction_id: int, db: Session = Depends(get_db)):
-    # (This logic remains similar, updating stock back up)
-    txn = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
-    if not txn or txn.return_date: raise HTTPException(status_code=400, detail="Invalid txn")
-    
-    txn.return_date = date.today()
-    txn.book.available_copies += 1
-    db.commit()
-    return {"message": "Book returned"}
+    users = db.query(models.User).filter(models.User.role != 'admin').all()
+    user_list = []
+    for u in users:
+        # Count active loans for this user
+        active_loans = db.query(models.Transaction).filter(
+            models.Transaction.user_id == u.id, 
+            models.Transaction.return_date == None
+        ).count()
+        
+        user_list.append({
+            "id": u.id,
+            "full_name": u.full_name,
+            "email": u.email,
+            "registration_number": u.registration_number,
+            "role": u.role,
+            "active_loans": active_loans,
+            "photo_url": u.photo_url
+        })
+    return user_list
