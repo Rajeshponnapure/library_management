@@ -6,7 +6,7 @@ import './index.css';
 
 function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
-  const [showPassword, setShowPassword] = useState(false); // <--- NEW STATE
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -17,30 +17,33 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
-    // Admin Hardcoded Login (Fast Track)
-    if(formData.email === "admin@cbit.edu.in" && formData.password === "admin123") {
-        localStorage.setItem('token', 'admin-dummy-token'); 
-        localStorage.setItem('role', 'admin');
-        window.location.href = "/admin"; 
-        return;
-    }
 
     try {
-      const res = await axios.post('http://127.0.0.1:8000/login', new URLSearchParams({
-        username: formData.email,
-        password: formData.password
-      }));
+      // 1. Convert to Form Data for FastAPI
+      const params = new URLSearchParams();
+      params.append('username', formData.email);
+      params.append('password', formData.password);
+
+      // 2. Send Real Request to Backend
+      const res = await axios.post('http://127.0.0.1:8000/login', params);
       
+      // 3. Save Real JWT Token
       localStorage.setItem('token', res.data.access_token);
       localStorage.setItem('role', res.data.role);
 
-      if (res.data.role === 'admin') navigate('/admin');
-      else navigate('/profile'); // Redirect student to profile/home
+      // 4. Redirect based on Role
+      if (res.data.role === 'admin') {
+          navigate('/admin');
+      } else {
+          navigate('/profile'); 
+      }
       
-      window.location.reload(); 
+      // Reload to apply changes
+      setTimeout(() => window.location.reload(), 100); 
+
     } catch (err) {
-      setError('Login Failed: Invalid email or password');
+      console.error("Login Error:", err);
+      setError('Login Failed: Invalid credentials or Server Error');
     }
   };
 
@@ -58,7 +61,7 @@ function Login() {
               name="email" 
               type="email" 
               className="modern-input" 
-              placeholder="📧 student@cbit.edu" 
+              placeholder="📧 student@cbit.edu.in" 
               onChange={handleChange}
               required 
             />
@@ -66,11 +69,10 @@ function Login() {
 
           <div style={{marginBottom: '20px', textAlign: 'left'}}>
             <label className="form-label">PASSWORD</label>
-            {/* WRAPPER FOR TOGGLE ICON */}
             <div className="password-input-wrapper">
                 <input 
                     name="password" 
-                    type={showPassword ? "text" : "password"} // <--- TOGGLES TYPE
+                    type={showPassword ? "text" : "password"} 
                     className="modern-input" 
                     placeholder="🔒 ••••••••" 
                     onChange={handleChange}

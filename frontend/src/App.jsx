@@ -30,7 +30,7 @@ function App() {
       {/* 1. NEW LOGO HEADER (White Background) */}
       <header className="header-logo-container">
         <div className="container" style={{margin: '0 auto', padding: '0 10px'}}>
-             <img src="/public/header_logo.png" alt="CBIT Library Header" className="header-logo-img" />
+             <img src="/header_logo.png" alt="CBIT Library Header" className="header-logo-img" />
         </div>
       </header>
 

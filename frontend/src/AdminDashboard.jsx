@@ -66,6 +66,21 @@ function AdminDashboard() {
     } catch (err) { alert("Error approving return"); }
   };
 
+  // --- NEW DELETE USER HANDLER ---
+  const handleDeleteUser = async (userId) => {
+    if(!window.confirm("Are you sure you want to permanently delete this user?")) return;
+
+    try {
+        await axios.delete(`http://127.0.0.1:8000/admin/users/${userId}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        alert("User Deleted Successfully");
+        fetchUsers(); // Refresh the list
+    } catch (err) {
+        alert("Delete Failed: " + (err.response?.data?.detail || "Unknown Error"));
+    }
+  };
+
   return (
     <div className="container">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
@@ -108,7 +123,7 @@ function AdminDashboard() {
                 <AdminIssue />
             </div>
 
-            {/* 3. RETURN REQUESTS (This is the missing table!) */}
+            {/* 3. RETURN REQUESTS */}
             {stats.return_requests.length > 0 && (
                 <div className="glass-card" style={{marginBottom:'30px', borderLeft: '5px solid #ffc107', background:'#fffbf2'}}>
                     <h3 style={{color: '#856404'}}>⚠️ Return Requests</h3>
@@ -241,7 +256,7 @@ function AdminDashboard() {
             <h3>Registered Users Directory</h3>
             <table>
                 <thead>
-                    <tr><th>Photo</th><th>Name / Reg No</th><th>Email</th><th>Role</th><th>Books Held</th></tr>
+                    <tr><th>Photo</th><th>Name / Reg No</th><th>Email</th><th>Role</th><th>Books Held</th><th>Action</th></tr>
                 </thead>
                 <tbody>
                     {users.map(u => (
@@ -251,6 +266,18 @@ function AdminDashboard() {
                             <td>{u.email}</td>
                             <td><span className="badge">{u.role}</span></td>
                             <td style={{fontWeight:'bold', color: u.active_loans > 0 ? 'red' : 'green'}}>{u.active_loans} Active Loans</td>
+                            {/* DELETE BUTTON */}
+                            <td>
+                                {u.role !== 'admin' && (
+                                    <button 
+                                        onClick={() => handleDeleteUser(u.id)} 
+                                        className="btn-danger" 
+                                        style={{padding:'5px 10px', fontSize:'0.8rem'}}
+                                    >
+                                        Delete
+                                    </button>
+                                )}
+                            </td>
                         </tr>
                     ))}
                 </tbody>

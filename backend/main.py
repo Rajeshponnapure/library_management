@@ -2,6 +2,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles # --- NEW IMPORT ---
+from fastapi.security import OAuth2PasswordRequestForm #
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date, timedelta,datetime
@@ -145,14 +146,21 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     return {"message": "Account created successfully"}
 
 @app.post("/login")
-def login(request: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == request.email).first()
-    if not user or not pwd_context.verify(request.password, user.hashed_password):
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # 1. Query the user (We map 'email' to the standard 'username' field)
+    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+
+    # 2. Verify Password
+    if not user or not pwd_context.verify(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
-    
+
+    # 3. Create Token
+    # We put the email in the 'sub' (subject) field of the token
     access_token = create_access_token(data={"sub": user.email, "role": user.role})
+
     return {
         "access_token": access_token, 
+        "token_type": "bearer",
         "user_id": user.id, 
         "role": user.role, 
         "full_name": user.full_name,
@@ -525,26 +533,61 @@ def reject_request(request_id: int, current_user: models.User = Depends(get_curr
     db.commit()
     return {"message": "Request Rejected"}
 # --- NEW: User Management Endpoint ---
+# backend/main.py
+
 @app.get("/admin/users")
 def get_all_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role != 'admin': raise HTTPException(status_code=403, detail="Not authorized")
+    # 1. Check if Admin
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     
-    users = db.query(models.User).filter(models.User.role != 'admin').all()
+    # 2. Fetch Users
+    users = db.query(models.User).all()
+    
+    # 3. Format Data
     user_list = []
     for u in users:
-        # Count active loans for this user
+        # Calculate active loans for each user
         active_loans = db.query(models.Transaction).filter(
-            models.Transaction.user_id == u.id, 
-            models.Transaction.return_date == None
+            models.Transaction.user_id == u.id,
+            models.Transaction.status == "Issued"
         ).count()
         
         user_list.append({
             "id": u.id,
             "full_name": u.full_name,
             "email": u.email,
-            "registration_number": u.registration_number,
             "role": u.role,
-            "active_loans": active_loans,
-            "photo_url": u.photo_url
+            "registration_number": u.registration_number,
+            "photo_url": u.photo_url,
+            "active_loans": active_loans
         })
     return user_list
+# backend/main.py
+
+@app.delete("/admin/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # 1. Admin Authorization
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # 2. Find the user
+    user_to_delete = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user_to_delete:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 3. SAFETY CHECK: Do not delete if they have books!
+    # We check if they have any active transactions (books not returned)
+    active_loans = db.query(models.Transaction).filter(
+        models.Transaction.user_id == user_id, 
+        models.Transaction.status == "Issued"
+    ).count()
+
+    if active_loans > 0:
+        raise HTTPException(status_code=400, detail=f"Cannot delete user. They still have {active_loans} books to return.")
+
+    # 4. Delete the User
+    db.delete(user_to_delete)
+    db.commit()
+
+    return {"message": "User deleted successfully"}
