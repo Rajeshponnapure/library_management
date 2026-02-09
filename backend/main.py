@@ -299,12 +299,19 @@ async def upload_photo(
 
 # --- BOOK SEARCH ---
 @app.get("/books/search/")
-def search_books(query: str = "", department: Optional[str] = None, db: Session = Depends(get_db)):
+def search_books(
+    query: str = "", 
+    department: str = "All", 
+    page: int = 1,      # <--- New Parameter
+    limit: int = 20,    # <--- New Parameter
+    db: Session = Depends(get_db)
+):
+    # 1. Start Query
     db_query = db.query(models.Book)
     
+    # 2. Apply Search Filters
     if query:
         search = f"%{query}%"
-        # Search across ALL relevant fields including Publisher, Bill No, etc.
         db_query = db_query.filter(
             (models.Book.title.ilike(search)) | 
             (models.Book.author.ilike(search)) |
@@ -314,11 +321,25 @@ def search_books(query: str = "", department: Optional[str] = None, db: Session 
             (models.Book.bill_number.ilike(search)) 
         )
     
+    # 3. Apply Department Filter
     if department and department != "All":
         db_query = db_query.filter(models.Book.department == department)
         
-    return db_query.all()
-
+    # 4. Get Total Count (So frontend knows how many pages exist)
+    total_books = db_query.count()
+    
+    # 5. Apply Pagination Logic (Skip & Take)
+    offset = (page - 1) * limit
+    books = db_query.offset(offset).limit(limit).all()
+    
+    # 6. Return Data in the new format the Frontend expects
+    return {
+        "data": books,
+        "total": total_books,
+        "page": page,
+        "limit": limit,
+        "total_pages": (total_books + limit - 1) // limit
+    }
 # --- ADMIN ISSUE ---
 @app.post("/admin/issue-book")
 def issue_book(request: IssueRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -781,4 +802,16 @@ def upload_books_excel(file: UploadFile = File(...), db: Session = Depends(get_d
     except Exception as e:
         print(f"Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+# --- ADD THIS TO ENABLE DELETING BOOKS ---
+@app.delete("/books/{book_id}")
+def delete_book(book_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     
+    book = db.query(models.Book).filter(models.Book.id == book_id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    db.delete(book)
+    db.commit()
+    return {"message": "Book deleted successfully"}
