@@ -1,4 +1,5 @@
 # backend/main.py
+import pandas as pd
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles # --- NEW IMPORT ---
@@ -15,6 +16,21 @@ import os
 import shutil # --- NEW IMPORT for saving files ---
 from dotenv import load_dotenv
 import time
+
+class BookCreateSchema(BaseModel):
+    title: str
+    author: str
+    acc_no: str
+    department: str
+    total_copies: int
+    # New Excel Fields
+    publisher: Optional[str] = ""
+    edition_year: Optional[str] = ""
+    pages: Optional[str] = ""
+    volume: Optional[str] = ""
+    source: Optional[str] = ""
+    bill_number: Optional[str] = ""
+    cost: Optional[float] = 0.0
 
 # --- SETUP ---
 load_dotenv()
@@ -283,14 +299,25 @@ async def upload_photo(
 
 # --- BOOK SEARCH ---
 @app.get("/books/search/")
-def search_books(query: str, db: Session = Depends(get_db)):
-    books = db.query(models.Book).filter(
-        (models.Book.title.contains(query)) |
-        (models.Book.author.contains(query)) |
-        (models.Book.acc_no.contains(query))|
-        (models.Book.department.contains(query))
-    ).all()
-    return books
+def search_books(query: str = "", department: Optional[str] = None, db: Session = Depends(get_db)):
+    db_query = db.query(models.Book)
+    
+    if query:
+        search = f"%{query}%"
+        # Search across ALL relevant fields including Publisher, Bill No, etc.
+        db_query = db_query.filter(
+            (models.Book.title.ilike(search)) | 
+            (models.Book.author.ilike(search)) |
+            (models.Book.acc_no.ilike(search)) |
+            (models.Book.publisher.ilike(search)) | 
+            (models.Book.source.ilike(search)) |    
+            (models.Book.bill_number.ilike(search)) 
+        )
+    
+    if department and department != "All":
+        db_query = db_query.filter(models.Book.department == department)
+        
+    return db_query.all()
 
 # --- ADMIN ISSUE ---
 @app.post("/admin/issue-book")
@@ -591,3 +618,167 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: model
     db.commit()
 
     return {"message": "User deleted successfully"}
+# backend/main.py
+
+@app.post("/books/")
+def create_book(book: BookCreateSchema, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Check if Acc No exists
+    if db.query(models.Book).filter(models.Book.acc_no == book.acc_no).first():
+        raise HTTPException(status_code=400, detail="Book with this Accession Number already exists.")
+
+    new_book = models.Book(
+        title=book.title,
+        author=book.author,
+        acc_no=book.acc_no,
+        department=book.department,
+        total_copies=book.total_copies,
+        available_copies=book.total_copies, 
+        # New Fields
+        publisher=book.publisher,
+        edition_year=book.edition_year,
+        pages=book.pages,
+        volume=book.volume,
+        source=book.source,
+        bill_number=book.bill_number,
+        cost=book.cost
+    )
+    db.add(new_book)
+    db.commit()
+    db.refresh(new_book)
+    return {"message": "Book added successfully", "book_id": new_book.id}
+
+@app.post("/admin/upload-books")
+def upload_books_excel(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    try:
+        # 1. Read ALL sheets
+        all_sheets = pd.read_excel(file.file, sheet_name=None, header=None)
+        
+        titles_added = 0
+        total_copies_added = 0
+        processed_sheets = []
+        
+        # --- SMART SELECTION STRATEGY ---
+        # If "Acc.Reg" exists, we ONLY process that + "Extra Books".
+        # We ignore "CSE", "ECE", etc. because they are already inside "Acc.Reg".
+        
+        target_sheets = {}
+        
+        # Check if we can find the Master Sheet
+        master_sheet_key = next((k for k in all_sheets.keys() if "acc.reg" in k.lower()), None)
+        extra_sheet_key = next((k for k in all_sheets.keys() if "extra" in k.lower()), None)
+
+        if master_sheet_key:
+            print(f"✅ Found Master Sheet: '{master_sheet_key}'. Ignoring department subsets.")
+            target_sheets[master_sheet_key] = all_sheets[master_sheet_key]
+            if extra_sheet_key:
+                target_sheets[extra_sheet_key] = all_sheets[extra_sheet_key]
+        else:
+            print("⚠️ Master Sheet not found. Processing ALL sheets (Risk of duplicates if not careful).")
+            target_sheets = all_sheets
+
+        # --------------------------------
+
+        for sheet_name, raw_df in target_sheets.items():
+            print(f"--- Processing Sheet: {sheet_name} ---")
+            
+            # 2. FIND HEADER ROW
+            header_row_index = -1
+            has_accession_col = False
+            
+            for i, row in raw_df.head(15).iterrows(): # Scan first 15 rows
+                row_str = row.astype(str).str.lower().tolist()
+                
+                # Check for Accession No header
+                if any("acc.no" in x or "acc no" in x for x in row_str):
+                    header_row_index = i
+                    has_accession_col = True
+                    break
+                # Check for Extra Books header
+                if any("s.no" in x for x in row_str) and any("cost" in x for x in row_str) and "extra" in str(sheet_name).lower():
+                    header_row_index = i
+                    has_accession_col = False
+                    break
+            
+            if header_row_index == -1:
+                print(f"Skipping '{sheet_name}': No valid header.")
+                continue
+
+            # 3. PREPARE DATA
+            raw_df.columns = raw_df.iloc[header_row_index] 
+            df = raw_df.iloc[header_row_index + 1:].reset_index(drop=True)
+            df.columns = [str(col).strip().lower().replace('.', '_').replace(' ', '_') for col in df.columns]
+            df = df.loc[:, ~df.columns.duplicated()]
+
+            # 4. INSERT BOOKS
+            for index, row in df.iterrows():
+                def get_val(keywords):
+                    for col in df.columns:
+                        if any(k in col for k in keywords):
+                            return row[col] if pd.notnull(row[col]) else None
+                    return None
+
+                # GENERATE ID
+                if has_accession_col:
+                    acc_val = get_val(['acc_no', 'acc_num'])
+                    if not acc_val: continue
+                    acc_no = str(acc_val).strip()
+                else:
+                    # Extra Books ID
+                    s_no = get_val(['s_no', 'sl_no'])
+                    if not s_no: continue
+                    acc_no = f"EXTRA-{int(float(s_no))}"
+
+                # PREVENT DUPLICATES (Database Check)
+                if db.query(models.Book).filter(models.Book.acc_no == acc_no).first():
+                    continue 
+
+                # EXTRACT FIELDS
+                copies_val = get_val(['no_of_copies', 'copies'])
+                try:
+                    total_copies = int(float(copies_val)) if copies_val else 1
+                except:
+                    total_copies = 1
+
+                cost_val = get_val(['cost'])
+                try:
+                    if isinstance(cost_val, str): cost_val = cost_val.replace('-', '.')
+                    cost = float(cost_val) if cost_val else 0.0
+                except:
+                    cost = 0.0
+
+                new_book = models.Book(
+                    acc_no=acc_no,
+                    title=str(get_val(['title']) or "Unknown"),
+                    author=str(get_val(['author']) or "Unknown"),
+                    department=str(get_val(['dept']) or "General"),
+                    publisher=str(get_val(['publisher']) or ""),
+                    edition_year=str(get_val(['edition']) or ""),
+                    pages=str(get_val(['pages']) or ""),
+                    volume=str(get_val(['volume']) or ""),
+                    source=str(get_val(['sources', 'source']) or ""),
+                    bill_number=str(get_val(['bill']) or ""),
+                    cost=cost,
+                    total_copies=total_copies,
+                    available_copies=total_copies
+                )
+                db.add(new_book)
+                titles_added += 1
+                total_copies_added += total_copies
+            
+            processed_sheets.append(sheet_name)
+
+        db.commit()
+        return {
+            "message": f"Success! Processed: {', '.join(processed_sheets)}. Added {titles_added} Titles ({total_copies_added} Physical Books). Numbers should now match your Excel."
+        }
+
+    except Exception as e:
+        print(f"Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    

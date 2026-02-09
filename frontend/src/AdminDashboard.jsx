@@ -16,12 +16,34 @@ function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [activeTab, setActiveTab] = useState('overview'); 
   
-  const issuedSectionRef = useRef(null);
+    const issuedSectionRef = useRef(null);
+    const fileInputRef = useRef(null); // Add this
 
   useEffect(() => {
     fetchStats();
     fetchUsers();
   }, []);
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        alert("Uploading... Please wait.");
+        const res = await axios.post('http://127.0.0.1:8000/admin/upload-books', formData, {
+            headers: { 
+                'Content-Type': 'multipart/form-data',
+                Authorization: `Bearer ${localStorage.getItem('token')}` 
+            }
+        });
+        alert(res.data.message);
+        fetchStats(); // Refresh numbers
+    } catch (err) {
+        alert("Upload Failed: " + (err.response?.data?.detail || err.message));
+    }
+};
 
   const fetchStats = async () => {
     try {
@@ -44,7 +66,7 @@ function AdminDashboard() {
   const scrollToIssued = () => {
     issuedSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-
+  
   // --- HANDLERS ---
   const handleBorrowAction = async (id, type) => {
     try {
@@ -121,6 +143,140 @@ function AdminDashboard() {
             <div className="glass-card" style={{marginBottom:'30px'}}>
                 <h3 style={{color: 'var(--primary)', borderBottom: '2px solid var(--accent)', display:'inline-block'}}>Issue New Book</h3>
                 <AdminIssue />
+            </div>
+            {/* BULK UPLOAD SECTION */}
+            <div className="glass-card" style={{marginBottom:'30px', borderLeft:'5px solid #007bff'}}>
+                <h3 style={{color: '#0056b3'}}>📂 Bulk Upload Books</h3>
+                <p style={{color:'#666', fontSize:'0.9rem'}}>Upload your Library Accession Register (Excel file) to add books instantly.</p>
+
+                <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    style={{display: 'none'}} 
+                    accept=".xlsx, .xls"
+                    onChange={handleFileUpload}
+                />
+
+                <button 
+                    className="btn-gold" 
+                    style={{background:'#007bff', color:'white', border:'none'}}
+                    onClick={() => fileInputRef.current.click()}
+                >
+                    Select Excel File
+                </button>
+            </div>
+            {/* --- PASTE THIS NEW FORM SECTION --- */}
+            <div className="glass-card" style={{marginTop: '30px', borderLeft: '5px solid #d4a017'}}>
+                <h3 style={{color: 'var(--primary)', borderBottom:'2px solid #eee', paddingBottom:'10px'}}>
+                    📖 Add New Book Manually
+                </h3>
+                
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const form = e.target;
+                    const bookData = {
+                        acc_no: form.acc_no.value,
+                        title: form.title.value,
+                        author: form.author.value,
+                        department: form.department.value,
+                        total_copies: parseInt(form.total_copies.value),
+                        publisher: form.publisher.value,
+                        edition_year: form.edition_year.value,
+                        pages: form.pages.value,
+                        volume: form.volume.value,
+                        source: form.source.value,
+                        bill_number: form.bill_number.value,
+                        cost: parseFloat(form.cost.value || 0)
+                    };
+
+                    try {
+                        await axios.post('http://127.0.0.1:8000/books/', bookData, {
+                            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                        });
+                        alert("Book Added Successfully!");
+                        form.reset(); // Clear form
+                        fetchStats(); // Refresh numbers
+                    } catch (err) {
+                        alert("Error: " + (err.response?.data?.detail || err.message));
+                    }
+                }}>
+                    
+                    {/* ROW 1: Essentials */}
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px'}}>
+                        <div>
+                            <label>Accession No *</label>
+                            <input name="acc_no" className="modern-input" placeholder="e.g. CSE-1001" required />
+                        </div>
+                        <div>
+                            <label>Book Title *</label>
+                            <input name="title" className="modern-input" placeholder="e.g. Python Programming" required />
+                        </div>
+                        <div>
+                            <label>Author *</label>
+                            <input name="author" className="modern-input" placeholder="e.g. Guido van Rossum" required />
+                        </div>
+                    </div>
+
+                    {/* ROW 2: Details */}
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '15px'}}>
+                        <div>
+                            <label>Department</label>
+                            <select name="department" className="modern-input">
+                                <option value="CSE">CSE</option>
+                                <option value="ECE">ECE</option>
+                                <option value="EEE">EEE</option>
+                                <option value="MECH">MECH</option>
+                                <option value="CIVIL">CIVIL</option>
+                                <option value="MBA">MBA</option>
+                                <option value="General">General</option>
+                                <option value="BS&H">BS&H</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Publisher</label>
+                            <input name="publisher" className="modern-input" placeholder="e.g. Pearson" />
+                        </div>
+                        <div>
+                            <label>Edition / Year</label>
+                            <input name="edition_year" className="modern-input" placeholder="e.g. 3rd / 2024" />
+                        </div>
+                        <div>
+                            <label>No. of Copies</label>
+                            <input name="total_copies" type="number" className="modern-input" defaultValue="1" min="1" />
+                        </div>
+                    </div>
+
+                    {/* ROW 3: Extra Info */}
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '20px'}}>
+                        <div>
+                            <label>Volume</label>
+                            <input name="volume" className="modern-input" placeholder="e.g. Vol-1" />
+                        </div>
+                        <div>
+                            <label>Pages</label>
+                            <input name="pages" className="modern-input" placeholder="e.g. 500" />
+                        </div>
+                        <div>
+                            <label>Source / Vendor</label>
+                            <input name="source" className="modern-input" placeholder="e.g. Amazon" />
+                        </div>
+                        <div>
+                            <label>Bill No & Date</label>
+                            <input name="bill_number" className="modern-input" placeholder="e.g. INV-9988" />
+                        </div>
+                    </div>
+
+                    {/* ROW 4: Cost & Action */}
+                    <div style={{display: 'flex', gap: '15px', alignItems: 'flex-end'}}>
+                        <div style={{flex: 1}}>
+                            <label>Cost (₹)</label>
+                            <input name="cost" type="number" step="0.01" className="modern-input" placeholder="0.00" />
+                        </div>
+                        <button type="submit" className="btn-gold" style={{flex: 2, height: '42px'}}>
+                            ➕ Add Book to Library
+                        </button>
+                    </div>
+                </form>
             </div>
 
             {/* 3. RETURN REQUESTS */}
