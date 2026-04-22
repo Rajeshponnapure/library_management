@@ -5,6 +5,7 @@ import AdminIssue from './AdminIssue';
 import './index.css';
 
 function AdminDashboard() {
+  // --- STATE ---
   const [stats, setStats] = useState({ 
     borrow_requests: [], 
     return_requests: [],
@@ -15,36 +16,19 @@ function AdminDashboard() {
   });
   const [users, setUsers] = useState([]);
   const [activeTab, setActiveTab] = useState('overview'); 
-  
-    const issuedSectionRef = useRef(null);
-    const fileInputRef = useRef(null); // Add this
+  const [fileUrl, setFileUrl] = useState(''); // Moved INSIDE the component
 
+  const pendingActionsRef = useRef(null);
+  const issuedSectionRef = useRef(null);
+  const fileInputRef = useRef(null); 
+
+  // --- EFFECTS ---
   useEffect(() => {
     fetchStats();
     fetchUsers();
   }, []);
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
 
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-        alert("Uploading... Please wait.");
-        const res = await axios.post('http://127.0.0.1:8000/admin/upload-books', formData, {
-            headers: { 
-                'Content-Type': 'multipart/form-data',
-                Authorization: `Bearer ${localStorage.getItem('token')}` 
-            }
-        });
-        alert(res.data.message);
-        fetchStats(); // Refresh numbers
-    } catch (err) {
-        alert("Upload Failed: " + (err.response?.data?.detail || err.message));
-    }
-};
-
+  // --- API CALLS ---
   const fetchStats = async () => {
     try {
       const res = await axios.get('http://127.0.0.1:8000/admin/dashboard-stats', {
@@ -63,19 +47,60 @@ function AdminDashboard() {
     } catch (err) { console.error(err); }
   };
 
+  // --- HANDLERS ---
+  const handleUrlImport = async () => {
+    if (!fileUrl) return;
+    try {
+        alert("Fetching file from URL...");
+        await axios.post('http://127.0.0.1:8000/admin/import-from-url', 
+            { url: fileUrl }, 
+            { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }}
+        );
+        alert("Success! Books imported.");
+        fetchStats();
+    } catch (err) {
+        alert("Error: " + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        alert("Uploading... Please wait.");
+        const res = await axios.post('http://127.0.0.1:8000/admin/upload-books', formData, {
+            headers: { 
+                'Content-Type': 'multipart/form-data',
+                Authorization: `Bearer ${localStorage.getItem('token')}` 
+            }
+        });
+        alert(res.data.message);
+        fetchStats(); 
+    } catch (err) {
+        alert("Upload Failed: " + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const scrollToIssued = () => {
     issuedSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  const scrollToPendingActions = () => {
+    pendingActionsRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
   
-  // --- HANDLERS ---
   const handleBorrowAction = async (id, type) => {
     try {
         await axios.post(`http://127.0.0.1:8000/admin/requests/${id}/${type}`, {}, { 
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
         });
-        alert(`Request ${type}ed!`);
+        alert(type === 'approve' ? 'Request approved and book issued!' : 'Request rejected.');
         fetchStats();
-    } catch (err) { alert("Failed to process request"); }
+    } catch (err) { alert(err.response?.data?.detail || "Failed to process request"); }
   };
 
   const handleReturnApprove = async (id) => {
@@ -88,21 +113,20 @@ function AdminDashboard() {
     } catch (err) { alert("Error approving return"); }
   };
 
-  // --- NEW DELETE USER HANDLER ---
   const handleDeleteUser = async (userId) => {
     if(!window.confirm("Are you sure you want to permanently delete this user?")) return;
-
     try {
         await axios.delete(`http://127.0.0.1:8000/admin/users/${userId}`, {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         alert("User Deleted Successfully");
-        fetchUsers(); // Refresh the list
+        fetchUsers(); 
     } catch (err) {
         alert("Delete Failed: " + (err.response?.data?.detail || "Unknown Error"));
     }
   };
 
+  // --- RENDER ---
   return (
     <div className="container">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
@@ -125,13 +149,11 @@ function AdminDashboard() {
                     <h3 style={{margin:0, color:'#666'}}>Available Copies</h3>
                     <h1 style={{margin:'10px 0', fontSize:'2.5rem', color:'#28a745'}}>{stats.available_copies}</h1>
                 </div>
-                
                 <div className="glass-card" onClick={scrollToIssued} style={{padding:'20px', textAlign:'center', borderLeft:'5px solid #d4a017', cursor: 'pointer'}}>
                     <h3 style={{margin:0, color:'#666'}}>Books Lent ⇩</h3>
                     <h1 style={{margin:'10px 0', fontSize:'2.5rem', color:'#d4a017'}}>{stats.books_lent}</h1>
                 </div>
-
-                <div className="glass-card" style={{padding:'20px', textAlign:'center', borderLeft:'5px solid #dc3545'}}>
+                <div className="glass-card" onClick={scrollToPendingActions} style={{padding:'20px', textAlign:'center', borderLeft:'5px solid #dc3545', cursor:'pointer'}}>
                     <h3 style={{margin:0, color:'#666'}}>Pending Actions</h3>
                     <h1 style={{margin:'10px 0', fontSize:'2.5rem', color:'#dc3545'}}>
                         {stats.borrow_requests.length + stats.return_requests.length}
@@ -144,214 +166,169 @@ function AdminDashboard() {
                 <h3 style={{color: 'var(--primary)', borderBottom: '2px solid var(--accent)', display:'inline-block'}}>Issue New Book</h3>
                 <AdminIssue />
             </div>
+
             {/* BULK UPLOAD SECTION */}
             <div className="glass-card" style={{marginBottom:'30px', borderLeft:'5px solid #007bff'}}>
                 <h3 style={{color: '#0056b3'}}>📂 Bulk Upload Books</h3>
                 <p style={{color:'#666', fontSize:'0.9rem'}}>Upload your Library Accession Register (Excel file) to add books instantly.</p>
-
-                <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    style={{display: 'none'}} 
-                    accept=".xlsx, .xls"
-                    onChange={handleFileUpload}
-                />
-
-                <button 
-                    className="btn-gold" 
-                    style={{background:'#007bff', color:'white', border:'none'}}
-                    onClick={() => fileInputRef.current.click()}
-                >
+                <input type="file" ref={fileInputRef} style={{display: 'none'}} accept=".xlsx, .xls" onChange={handleFileUpload} />
+                <button className="btn-gold" style={{background:'#007bff', color:'white', border:'none'}} onClick={() => fileInputRef.current.click()}>
                     Select Excel File
                 </button>
             </div>
-            {/* --- PASTE THIS NEW FORM SECTION --- */}
+
+            {/* URL IMPORT SECTION */}
+            <div className="glass-card" style={{marginBottom:'30px', borderLeft:'5px solid #28a745'}}>
+                <h3>☁️ Import from Link</h3>
+                <p style={{fontSize:'0.9rem', color:'#666'}}>Paste a direct download link (Dropbox/Google Drive Direct Link).</p>
+                <div style={{display: 'flex', gap: '10px'}}>
+                    <input className="modern-input" placeholder="https://example.com/books.xlsx" value={fileUrl} onChange={(e) => setFileUrl(e.target.value)} style={{flex: 1}} />
+                    <button className="btn-gold" style={{background: '#28a745'}} onClick={handleUrlImport}>Import</button>
+                </div>
+            </div>
+            
+            {/* MANUAL ADD BOOK */}
             <div className="glass-card" style={{marginTop: '30px', borderLeft: '5px solid #d4a017'}}>
-                <h3 style={{color: 'var(--primary)', borderBottom:'2px solid #eee', paddingBottom:'10px'}}>
-                    📖 Add New Book Manually
-                </h3>
-                
+                <h3 style={{color: 'var(--primary)', borderBottom:'2px solid #eee', paddingBottom:'10px'}}>📖 Add New Book Manually</h3>
                 <form onSubmit={async (e) => {
                     e.preventDefault();
                     const form = e.target;
                     const bookData = {
-                        acc_no: form.acc_no.value,
-                        title: form.title.value,
-                        author: form.author.value,
-                        department: form.department.value,
-                        total_copies: parseInt(form.total_copies.value),
-                        publisher: form.publisher.value,
-                        edition_year: form.edition_year.value,
-                        pages: form.pages.value,
-                        volume: form.volume.value,
-                        source: form.source.value,
-                        bill_number: form.bill_number.value,
-                        cost: parseFloat(form.cost.value || 0)
+                        acc_no: form.acc_no.value, title: form.title.value, author: form.author.value,
+                        department: form.department.value, total_copies: parseInt(form.total_copies.value),
+                        publisher: form.publisher.value, edition_year: form.edition_year.value,
+                        pages: form.pages.value, volume: form.volume.value, source: form.source.value,
+                        bill_number: form.bill_number.value, cost: parseFloat(form.cost.value || 0)
                     };
-
                     try {
-                        await axios.post('http://127.0.0.1:8000/books/', bookData, {
-                            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                        });
-                        alert("Book Added Successfully!");
-                        form.reset(); // Clear form
-                        fetchStats(); // Refresh numbers
-                    } catch (err) {
-                        alert("Error: " + (err.response?.data?.detail || err.message));
-                    }
+                        await axios.post('http://127.0.0.1:8000/books/', bookData, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }});
+                        alert("Book Added Successfully!"); form.reset(); fetchStats();
+                    } catch (err) { alert("Error: " + (err.response?.data?.detail || err.message)); }
                 }}>
-                    
-                    {/* ROW 1: Essentials */}
                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px'}}>
-                        <div>
-                            <label>Accession No *</label>
-                            <input name="acc_no" className="modern-input" placeholder="e.g. CSE-1001" required />
-                        </div>
-                        <div>
-                            <label>Book Title *</label>
-                            <input name="title" className="modern-input" placeholder="e.g. Python Programming" required />
-                        </div>
-                        <div>
-                            <label>Author *</label>
-                            <input name="author" className="modern-input" placeholder="e.g. Guido van Rossum" required />
-                        </div>
+                        <input name="acc_no" className="modern-input" placeholder="Acc No *" required />
+                        <input name="title" className="modern-input" placeholder="Book Title *" required />
+                        <input name="author" className="modern-input" placeholder="Author *" required />
                     </div>
-
-                    {/* ROW 2: Details */}
                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '15px'}}>
-                        <div>
-                            <label>Department</label>
-                            <select name="department" className="modern-input">
-                                <option value="CSE">CSE</option>
-                                <option value="ECE">ECE</option>
-                                <option value="EEE">EEE</option>
-                                <option value="MECH">MECH</option>
-                                <option value="CIVIL">CIVIL</option>
-                                <option value="MBA">MBA</option>
-                                <option value="General">General</option>
-                                <option value="BS&H">BS&H</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label>Publisher</label>
-                            <input name="publisher" className="modern-input" placeholder="e.g. Pearson" />
-                        </div>
-                        <div>
-                            <label>Edition / Year</label>
-                            <input name="edition_year" className="modern-input" placeholder="e.g. 3rd / 2024" />
-                        </div>
-                        <div>
-                            <label>No. of Copies</label>
-                            <input name="total_copies" type="number" className="modern-input" defaultValue="1" min="1" />
-                        </div>
+                        <select name="department" className="modern-input">
+                            <option value="CSE">CSE</option><option value="ECE">ECE</option><option value="EEE">EEE</option>
+                            <option value="MECH">MECH</option><option value="CIVIL">CIVIL</option><option value="MBA">MBA</option>
+                            <option value="General">General</option><option value="BS&H">BS&H</option>
+                        </select>
+                        <input name="publisher" className="modern-input" placeholder="Publisher" />
+                        <input name="edition_year" className="modern-input" placeholder="Edition / Year" />
+                        <input name="total_copies" type="number" className="modern-input" defaultValue="1" min="1" placeholder="Copies" />
                     </div>
-
-                    {/* ROW 3: Extra Info */}
-                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '20px'}}>
-                        <div>
-                            <label>Volume</label>
-                            <input name="volume" className="modern-input" placeholder="e.g. Vol-1" />
-                        </div>
-                        <div>
-                            <label>Pages</label>
-                            <input name="pages" className="modern-input" placeholder="e.g. 500" />
-                        </div>
-                        <div>
-                            <label>Source / Vendor</label>
-                            <input name="source" className="modern-input" placeholder="e.g. Amazon" />
-                        </div>
-                        <div>
-                            <label>Bill No & Date</label>
-                            <input name="bill_number" className="modern-input" placeholder="e.g. INV-9988" />
-                        </div>
-                    </div>
-
-                    {/* ROW 4: Cost & Action */}
-                    <div style={{display: 'flex', gap: '15px', alignItems: 'flex-end'}}>
-                        <div style={{flex: 1}}>
-                            <label>Cost (₹)</label>
-                            <input name="cost" type="number" step="0.01" className="modern-input" placeholder="0.00" />
-                        </div>
-                        <button type="submit" className="btn-gold" style={{flex: 2, height: '42px'}}>
-                            ➕ Add Book to Library
-                        </button>
-                    </div>
+                    <button type="submit" className="btn-gold" style={{width:'100%'}}>➕ Add Book</button>
                 </form>
             </div>
 
-            {/* 3. RETURN REQUESTS */}
-            {stats.return_requests.length > 0 && (
-                <div className="glass-card" style={{marginBottom:'30px', borderLeft: '5px solid #ffc107', background:'#fffbf2'}}>
-                    <h3 style={{color: '#856404'}}>⚠️ Return Requests</h3>
-                    <table>
-                        <thead>
-                            <tr style={{background: '#ffc107', color: '#000'}}>
-                                <th>Student</th>
-                                <th>Book Returning</th>
-                                <th>Due Date</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {stats.return_requests.map((req) => (
-                                <tr key={req.request_id}>
-                                    <td>
-                                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                                            <img src={req.student_photo || "https://via.placeholder.com/40"} style={{width:'40px', height:'40px', borderRadius:'50%'}} />
-                                            <div><strong>{req.student_name}</strong><br/><span style={{fontSize:'0.8rem'}}>{req.student_reg}</span></div>
-                                        </div>
-                                    </td>
-                                    <td><b>{req.book_title}</b><br/><span style={{fontSize:'0.8rem'}}>Acc: {req.book_acc_no}</span></td>
-                                    <td>{req.due_date}</td>
-                                    <td>
-                                        <button className="btn-gold" onClick={() => handleReturnApprove(req.request_id)}>
-                                            Approve Return
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            {/* PENDING REQUESTS */}
+            <div className="glass-card" ref={pendingActionsRef} style={{marginTop:'30px', marginBottom:'30px', borderLeft:'5px solid #dc3545'}}>
+                <h2 style={{color:'var(--primary)', marginBottom:'10px'}}>Pending Requests</h2>
+                <p style={{color:'#666', marginTop:0}}>
+                    Review student borrow requests and return confirmations.
+                </p>
 
-            {/* 4. INCOMING BORROW REQUESTS */}
-            {stats.borrow_requests.length > 0 && (
-                <div className="glass-card" style={{marginBottom:'30px', borderLeft: '5px solid #28a745'}}>
-                    <h3 style={{color: '#155724'}}>📥 Incoming Borrow Requests</h3>
-                    <table>
-                        <thead>
-                            <tr style={{background: '#28a745', color: 'white'}}>
-                                <th>Student</th>
-                                <th>Requested Book</th>
-                                <th>Date</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {stats.borrow_requests.map((req) => (
-                                <tr key={req.request_id}>
-                                    <td>
-                                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                                            <img src={req.student_photo || "https://via.placeholder.com/40"} style={{width:'40px', height:'40px', borderRadius:'50%'}} />
-                                            <div><strong>{req.student_name}</strong><br/><span style={{fontSize:'0.8rem'}}>{req.student_reg}</span></div>
-                                        </div>
-                                    </td>
-                                    <td><b>{req.book_title}</b><br/><span style={{fontSize:'0.8rem'}}>Acc: {req.book_acc_no}</span></td>
-                                    <td>{req.request_date}</td>
-                                    <td>
-                                        <button className="btn-gold" style={{marginRight:'10px'}} onClick={() => handleBorrowAction(req.request_id, 'approve')}>Approve</button>
-                                        <button className="btn-danger" onClick={() => handleBorrowAction(req.request_id, 'reject')}>Reject</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                {stats.borrow_requests.length === 0 && stats.return_requests.length === 0 ? (
+                    <p style={{color:'#666', fontStyle:'italic', marginBottom:0}}>No pending requests right now.</p>
+                ) : (
+                    <>
+                        {stats.borrow_requests.length > 0 && (
+                            <div style={{marginTop:'25px'}}>
+                                <h3 style={{color:'#155724', marginBottom:'12px'}}>Borrow Requests</h3>
+                                <div style={{overflowX:'auto'}}>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Student</th>
+                                                <th>Requested Book</th>
+                                                <th>Requested On</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {stats.borrow_requests.map((req) => (
+                                                <tr key={`borrow-${req.request_id}`}>
+                                                    <td>
+                                                        <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                                                            <img src={req.student_photo || "https://via.placeholder.com/40"} alt="" style={{width:'42px', height:'42px', borderRadius:'50%', objectFit:'cover'}} />
+                                                            <div>
+                                                                <strong>{req.student_name}</strong>
+                                                                <div style={{fontSize:'0.82rem', color:'#666'}}>{req.student_reg || 'No registration number'}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <strong>{req.book_title}</strong>
+                                                        <div style={{fontSize:'0.82rem', color:'#666'}}>Acc: {req.book_acc_no}</div>
+                                                    </td>
+                                                    <td>{req.request_date}</td>
+                                                    <td>
+                                                        <button className="btn-gold" style={{marginRight:'10px', padding:'8px 14px'}} onClick={() => handleBorrowAction(req.request_id, 'approve')}>
+                                                            Approve
+                                                        </button>
+                                                        <button className="btn-danger" style={{padding:'8px 14px'}} onClick={() => handleBorrowAction(req.request_id, 'reject')}>
+                                                            Reject
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
 
-            {/* 5. CURRENTLY ISSUED BOOKS */}
-            <div className="glass-card" ref={issuedSectionRef}>
+                        {stats.return_requests.length > 0 && (
+                            <div style={{marginTop:'30px'}}>
+                                <h3 style={{color:'#856404', marginBottom:'12px'}}>Return Requests</h3>
+                                <div style={{overflowX:'auto'}}>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Student</th>
+                                                <th>Returning Book</th>
+                                                <th>Due Date</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {stats.return_requests.map((req) => (
+                                                <tr key={`return-${req.request_id}`}>
+                                                    <td>
+                                                        <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                                                            <img src={req.student_photo || "https://via.placeholder.com/40"} alt="" style={{width:'42px', height:'42px', borderRadius:'50%', objectFit:'cover'}} />
+                                                            <div>
+                                                                <strong>{req.student_name}</strong>
+                                                                <div style={{fontSize:'0.82rem', color:'#666'}}>{req.student_reg || 'No registration number'}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <strong>{req.book_title}</strong>
+                                                        <div style={{fontSize:'0.82rem', color:'#666'}}>Acc: {req.book_acc_no}</div>
+                                                    </td>
+                                                    <td>{req.due_date}</td>
+                                                    <td>
+                                                        <button className="btn-gold" style={{padding:'8px 14px'}} onClick={() => handleReturnApprove(req.request_id)}>
+                                                            Approve Return
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+             {/* 5. CURRENTLY ISSUED BOOKS */}
+            <div className="glass-card" ref={issuedSectionRef} style={{marginTop:'30px'}}>
                 <h2 style={{color: 'var(--primary)', marginBottom: '20px'}}>
                     Currently Issued Books Details
                     <span style={{fontSize:'1rem', marginLeft:'10px', background:'#eee', padding:'5px 10px', borderRadius:'15px'}}>{stats.active_loans.length}</span>
@@ -375,29 +352,13 @@ function AdminDashboard() {
                                 <img src={loan.student_photo || "https://via.placeholder.com/50"} style={{width:'55px', height:'55px', borderRadius:'50%', objectFit:'cover', border:'2px solid var(--accent)'}} />
                                 <div>
                                     <div style={{fontWeight:'bold', fontSize:'1.05rem', color:'var(--primary)'}}>{loan.student_name}</div>
-                                    <div style={{fontSize:'0.85rem', color:'#555', marginTop:'2px'}}>
-                                        {loan.student_reg} 
-                                        {loan.student_branch && <span style={{background:'#eee', padding:'1px 6px', borderRadius:'4px', marginLeft:'8px'}}>{loan.student_branch}</span>}
-                                        {loan.student_year && <span style={{background:'#eee', padding:'1px 6px', borderRadius:'4px', marginLeft:'5px'}}>{loan.student_year} Year</span>}
-                                    </div>
+                                    <div style={{fontSize:'0.85rem', color:'#555', marginTop:'2px'}}>{loan.student_reg}</div>
                                 </div>
                             </div>
                           </td>
-                          <td style={{fontSize:'0.9rem', color:'#444'}}>
-                            {loan.student_email ? <div>📧 {loan.student_email}</div> : <div style={{color:'#999'}}>No Email</div>}
-                            <div>📞 {loan.student_mobile || "No Mobile"}</div>
-                          </td>
-                          <td>
-                            <div style={{fontWeight:'600', color:'#000'}}>{loan.book_title}</div>
-                            <div style={{fontSize:'0.85rem', color:'#666', marginTop:'2px'}}>ACC: {loan.book_acc_no}</div>
-                          </td>
-                          <td style={{borderRadius:'0 10px 10px 0'}}>
-                            <div style={{fontSize:'0.85rem', color:'#666'}}>Issued: {loan.issue_date}</div>
-                            <div style={{marginTop:'5px', fontWeight:'bold', color: loan.fine_est > 0 ? '#d32f2f' : '#2e7d32'}}>
-                                Due: {loan.due_date}
-                                {loan.fine_est > 0 && <span style={{display:'block', fontSize:'0.8rem', background:'#ffebee', padding:'2px 5px', borderRadius:'4px', marginTop:'2px'}}>⚠️ Fine: ₹{loan.fine_est}</span>}
-                            </div>
-                          </td>
+                          <td>{loan.student_email}</td>
+                          <td>{loan.book_title}<br/>Acc: {loan.book_acc_no}</td>
+                          <td>Issued: {loan.issue_date}<br/>Due: {loan.due_date}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -412,26 +373,18 @@ function AdminDashboard() {
             <h3>Registered Users Directory</h3>
             <table>
                 <thead>
-                    <tr><th>Photo</th><th>Name / Reg No</th><th>Email</th><th>Role</th><th>Books Held</th><th>Action</th></tr>
+                    <tr><th>Photo</th><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                     {users.map(u => (
                         <tr key={u.id}>
                             <td><img src={u.photo_url || "https://via.placeholder.com/40"} style={{width:'40px', height:'40px', borderRadius:'50%'}} /></td>
-                            <td><strong>{u.full_name}</strong><br/><span style={{fontSize:'0.8rem', color:'#666'}}>{u.registration_number || 'N/A'}</span></td>
+                            <td>{u.full_name}</td>
                             <td>{u.email}</td>
-                            <td><span className="badge">{u.role}</span></td>
-                            <td style={{fontWeight:'bold', color: u.active_loans > 0 ? 'red' : 'green'}}>{u.active_loans} Active Loans</td>
-                            {/* DELETE BUTTON */}
+                            <td>{u.role}</td>
                             <td>
                                 {u.role !== 'admin' && (
-                                    <button 
-                                        onClick={() => handleDeleteUser(u.id)} 
-                                        className="btn-danger" 
-                                        style={{padding:'5px 10px', fontSize:'0.8rem'}}
-                                    >
-                                        Delete
-                                    </button>
+                                    <button onClick={() => handleDeleteUser(u.id)} className="btn-danger">Delete</button>
                                 )}
                             </td>
                         </tr>

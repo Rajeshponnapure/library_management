@@ -9,6 +9,12 @@ logs/
 # Environment variables
 .env
 .env.*
+!.env.example
+!backend/.env.example
+
+# Secrets
+backend/credentials.json
+!backend/credentials.example.json
 
 # IDE / Editor
 .vscode/
@@ -19,6 +25,7 @@ logs/
 node_modules/
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Build folders
 dist/
@@ -26,8 +33,16 @@ build/
 
 # Virtual environments
 venv/
+.venv/
 .env/
-#Excel files
-echo "CBIT ACC Register- as on 28.08.25.xls" >> .gitignore
-echo "*.xlsx" >> .gitignore
-echo "*.xls" >> .gitignore
+
+# Local backend runtime data
+*.db
+backend/uploads/
+
+# Data imports/exports
+*.xlsx
+*.xls
+
+# Local assistant/runtime metadata
+.sixth/

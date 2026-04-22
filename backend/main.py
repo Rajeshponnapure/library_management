@@ -9,13 +9,15 @@ from sqlalchemy import func
 from datetime import date, timedelta,datetime
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Any, Optional
 from jose import jwt, JWTError
 import models, database
 import os
 import shutil # --- NEW IMPORT for saving files ---
 from dotenv import load_dotenv
 import time
+import gspread
+from google.oauth2.service_account import Credentials
 
 class BookCreateSchema(BaseModel):
     title: str
@@ -37,6 +39,23 @@ load_dotenv()
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
+
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+# Load Credentials
+creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
+client = gspread.authorize(creds)
+
+# Open the Sheet (Replace with your actual Sheet Name)
+SHEET_NAME = "CBIT Library Data"
+try:
+    sheet = client.open(SHEET_NAME)
+    books_sheet = sheet.worksheet("Acc.Reg") # Ensure this tab exists!
+except Exception as e:
+    print(f"Error opening sheet: {e}")
 
 # --- NEW: SETUP UPLOADS DIRECTORY ---
 UPLOAD_DIR = "uploads"
@@ -90,8 +109,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None: raise HTTPException(status_code=401, detail="Invalid token")
+        email = payload.get("sub")
+        if not isinstance(email, str): raise HTTPException(status_code=401, detail="Invalid token")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
     
@@ -195,7 +214,7 @@ def read_users_me(current_user: models.User = Depends(get_current_user), db: Ses
     
     loan_data = []
     for loan in loans:
-        book = db.query(models.Book).filter(models.Book.id == loan.book_id).first()
+        book = loan.book
         fine = 0.0
         if date.today() > loan.due_date and current_user.role == "student":
             days = (date.today() - loan.due_date).days
@@ -219,7 +238,7 @@ def read_users_me(current_user: models.User = Depends(get_current_user), db: Ses
 
     request_data = []
     for req in requests:
-        book = db.query(models.Book).filter(models.Book.id == req.book_id).first()
+        book = req.book
         request_data.append({
             "request_id": req.id,
             "title": book.title,
@@ -264,11 +283,12 @@ async def upload_photo(
     current_user: models.User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-    if not file.content_type.startswith('image/'):
+    if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(400, detail="File must be an image")
 
     # Generate Unique Filename with Timestamp
-    file_extension = os.path.splitext(file.filename)[1]
+    upload_name = file.filename or "profile"
+    file_extension = os.path.splitext(upload_name)[1]
     timestamp = int(time.time()) 
     new_filename = f"user_{current_user.id}_{timestamp}{file_extension}" # <--- Unique Name
     
@@ -469,6 +489,8 @@ def approve_return(transaction_id: int, db: Session = Depends(get_db), current_u
     if not txn: raise HTTPException(status_code=404, detail="Transaction not found")
 
     user = db.query(models.User).filter(models.User.id == txn.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Borrower not found")
     
     # Calculate Fine
     fine = 0.0
@@ -482,6 +504,8 @@ def approve_return(transaction_id: int, db: Session = Depends(get_db), current_u
     
     # Restock Book
     book = db.query(models.Book).filter(models.Book.id == txn.book_id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
     book.available_copies += 1
     
     db.commit()
@@ -712,7 +736,8 @@ def upload_books_excel(file: UploadFile = File(...), db: Session = Depends(get_d
             header_row_index = -1
             has_accession_col = False
             
-            for i, row in raw_df.head(15).iterrows(): # Scan first 15 rows
+            for i in range(min(15, len(raw_df.index))): # Scan first 15 rows
+                row = raw_df.iloc[i]
                 row_str = row.astype(str).str.lower().tolist()
                 
                 # Check for Accession No header
@@ -733,15 +758,17 @@ def upload_books_excel(file: UploadFile = File(...), db: Session = Depends(get_d
             # 3. PREPARE DATA
             raw_df.columns = raw_df.iloc[header_row_index] 
             df = raw_df.iloc[header_row_index + 1:].reset_index(drop=True)
-            df.columns = [str(col).strip().lower().replace('.', '_').replace(' ', '_') for col in df.columns]
-            df = df.loc[:, ~df.columns.duplicated()]
+            df = df.rename(columns=lambda col: str(col).strip().lower().replace('.', '_').replace(' ', '_'))
+            df = df.T.drop_duplicates().T
 
             # 4. INSERT BOOKS
             for index, row in df.iterrows():
-                def get_val(keywords):
+                def get_val(keywords: list[str]) -> Any | None:
                     for col in df.columns:
-                        if any(k in col for k in keywords):
-                            return row[col] if pd.notnull(row[col]) else None
+                        column_name = str(col)
+                        if any(k in column_name for k in keywords):
+                            value = row.get(column_name)
+                            return value if pd.notnull(value) else None
                     return None
 
                 # GENERATE ID
